@@ -1,5 +1,5 @@
 <launch>
-    <arg name="serial_port" />
+    <arg name="serial_port" default="/dev/ttyACM0" />
     <arg name="baud_rate" default="115200" />
     <node pkg="uwb" type="uwb_range_node.py" name="uwb_range_node" output="screen">
         <param name="serial_port" value="$(arg serial_port)" />
