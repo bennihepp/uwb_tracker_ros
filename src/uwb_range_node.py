@@ -12,7 +12,7 @@ import rospy
 
 import select
 import serial
-from uwb.msg import UWBRange
+from uwb.src.mavlink_bridge.uwb import UWBRange
 from uwb_protocol import UWBTextStruct
 
 class UWBReader(object):
