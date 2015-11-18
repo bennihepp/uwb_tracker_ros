@@ -1,4 +1,5 @@
-uint16 device_id
-int32 stamp_us
+uint8 address
+uint8 remote_address
+uint32 stamp_us
+float32 round_trip_time
 float32 range
-uint16 target_id

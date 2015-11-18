@@ -23,7 +23,7 @@ baud_rate = args.baud_rate
 
 print("Serial port: {}, Baud-rate: {}".format(serial_port, baud_rate))
 
-ser = serial.Serial(serial_port, baud_rate, timeout=None)
+ser = serial.Serial(serial_port, baud_rate, timeout=0)
 mav = mavlink_bridge.MAVLinkBridge(ser)
 try:
     while True:
