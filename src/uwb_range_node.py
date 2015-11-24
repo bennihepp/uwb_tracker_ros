@@ -86,6 +86,8 @@ class UWBReader(object):
                 if now - last_now >= self.INFO_PRINT_RATE:
                     msg_rate = msg_count / (now - last_now)
                     print("Receiving MAVLink messages with rate {} Hz".format(msg_rate))
+                    last_now = now
+                    msg_count = 0
             except mavlink_bridge.uwb.MAVError, e:
                 if self.mav_error_handler is not None:
                     self.mav_error_handler(e)
