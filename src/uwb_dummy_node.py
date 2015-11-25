@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""uwb_range.py: Streams dummy UWB range measurements."""
+"""uwb_dummy_node.py: Streams dummy UWB range measurements."""
 
 __author__      = "Benjamin Hepp"
 __email__ = "benjamin.hepp@inf.ethz.ch"
@@ -46,7 +46,7 @@ class UWBDummyPublisher(object):
 
 
 def main():
-    rospy.init_node('uwb_range_node')
+    rospy.init_node('uwb_dummy_node')
 
     uwb_topic = rospy.get_param('~uwb_topic', '/uwb/dummy_range')
     print("Publishing to {}".format(uwb_topic))
