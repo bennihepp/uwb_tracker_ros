@@ -18,6 +18,8 @@ import mavlink_bridge
 
 class UWBReader(object):
 
+    INFO_PRINT_RATE = 5
+
     def __init__(self, serial_port, baud_rate, uwb_topic, uwb_stats_topic = None):
         if uwb_stats_topic is None:
             uwb_stats_topic = '{}_stats'.format(uwb_topic)
@@ -31,6 +33,8 @@ class UWBReader(object):
         self.mav_error_handler = error_handler
 
     def run(self):
+        msg_count = 0
+        last_now = rospy.get_time()
         while not rospy.is_shutdown():
             try:
                 msg = self.mav.try_receive_message()
@@ -77,6 +81,13 @@ class UWBReader(object):
                         ros_msg.prf[1] = msg.prf_2
                         ros_msg.prf[2] = msg.prf_3
                         self.uwb_stats_pub.publish(ros_msg)
+                    msg_count += 1
+                now = rospy.get_time()
+                if now - last_now >= self.INFO_PRINT_RATE:
+                    msg_rate = msg_count / (now - last_now)
+                    print("Receiving MAVLink messages with rate {} Hz".format(msg_rate))
+                    last_now = now
+                    msg_count = 0
             except mavlink_bridge.uwb.MAVError, e:
                 if self.mav_error_handler is not None:
                     self.mav_error_handler(e)
@@ -102,3 +113,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
