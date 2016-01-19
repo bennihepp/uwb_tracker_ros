@@ -29,6 +29,7 @@ class UWBDummyPublisher(object):
             stamp_us = 1
             round_trip_time = 1
             ros_msg = UWBRange()
+            ros_msg.header.stamp = rospy.Time.now()
             ros_msg.address = address
             ros_msg.remote_address = remote_address
             ros_msg.stamp_us = stamp_us
@@ -37,6 +38,7 @@ class UWBDummyPublisher(object):
             self.uwb_pub.publish(ros_msg)
 
             ros_msg = UWBRangeStats()
+            ros_msg.header.stamp = rospy.Time.now()
             ros_msg.address = address
             ros_msg.remote_address = remote_address
             ros_msg.stamp_us = stamp_us

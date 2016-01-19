@@ -42,6 +42,7 @@ class UWBReader(object):
                     if msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_RANGE:
                         #print("UWB range: {}".format(msg))
                         ros_msg = UWBRange()
+                        ros_msg.header.stamp = rospy.Time.now()
                         ros_msg.address = msg.address
                         ros_msg.remote_address = msg.remote_address
                         ros_msg.stamp_us = msg.stamp_us
@@ -51,6 +52,7 @@ class UWBReader(object):
                     elif msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_RANGE_STATS:
                         #print("UWB range stat: {}".format(msg))
                         ros_msg = UWBRangeStats()
+                        ros_msg.header.stamp = rospy.Time.now()
                         ros_msg.address = msg.address
                         ros_msg.remote_address = msg.remote_address
                         ros_msg.stamp_us = msg.stamp_us
