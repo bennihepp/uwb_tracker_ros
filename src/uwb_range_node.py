@@ -102,11 +102,13 @@ def main():
 
     serial_port = rospy.get_param('~serial_port')
     baud_rate = int(rospy.get_param('~baud_rate', "115200"))
+    publish_stats_str = rospy.get_param('~publish_stats', 'false')
+    publish_stats = publish_stats_str.lower() == 'true'
     uwb_topic = rospy.get_param('~uwb_topic', '/uwb/range')
     print("Reading from serial port {} with baud-rate {}".format(serial_port, baud_rate))
     print("Publishing to {}".format(uwb_topic))
 
-    ur = UWBReader(serial_port, baud_rate, uwb_topic)
+    ur = UWBReader(serial_port, baud_rate, uwb_topic, publish_stats)
     try:
         ur.run()
     except (rospy.ROSInterruptException, select.error):
