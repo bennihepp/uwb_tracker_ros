@@ -83,7 +83,7 @@ class UWBReader(object):
                         ros_msg.prf[1] = msg.prf_2
                         ros_msg.prf[2] = msg.prf_3
                         self.uwb_stats_pub.publish(ros_msg)
-                    msg_count += 1
+                        msg_count += 1
                 now = rospy.get_time()
                 if now - last_now >= self.INFO_PRINT_RATE:
                     msg_rate = msg_count / (now - last_now)
