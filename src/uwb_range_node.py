@@ -49,6 +49,7 @@ class UWBReader(object):
                         ros_msg.round_trip_time = msg.round_trip_time
                         ros_msg.range = msg.range
                         self.uwb_pub.publish(ros_msg)
+                        msg_count += 1
                     elif msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_RANGE_STATS:
                         #print("UWB range stat: {}".format(msg))
                         ros_msg = UWBRangeStats()
@@ -83,7 +84,6 @@ class UWBReader(object):
                         ros_msg.prf[1] = msg.prf_2
                         ros_msg.prf[2] = msg.prf_3
                         self.uwb_stats_pub.publish(ros_msg)
-                        msg_count += 1
                 now = rospy.get_time()
                 if now - last_now >= self.INFO_PRINT_RATE:
                     msg_rate = msg_count / (now - last_now)
@@ -102,11 +102,13 @@ def main():
 
     serial_port = rospy.get_param('~serial_port')
     baud_rate = int(rospy.get_param('~baud_rate', "115200"))
+    publish_stats_str = rospy.get_param('~publish_stats', 'false')
+    publish_stats = publish_stats_str.lower() == 'true'
     uwb_topic = rospy.get_param('~uwb_topic', '/uwb/range')
     print("Reading from serial port {} with baud-rate {}".format(serial_port, baud_rate))
     print("Publishing to {}".format(uwb_topic))
 
-    ur = UWBReader(serial_port, baud_rate, uwb_topic)
+    ur = UWBReader(serial_port, baud_rate, uwb_topic, publish_stats)
     try:
         ur.run()
     except (rospy.ROSInterruptException, select.error):
