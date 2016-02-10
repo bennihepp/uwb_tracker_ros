@@ -6,8 +6,16 @@ project(uwb)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   std_msgs
-  message_generation
   rospy
+  cmake_modules
+  geometry_msgs
+  mavros
+  roscpp
+  sensor_msgs
+  std_msgs
+  tf
+  dynamic_reconfigure 
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -79,10 +87,17 @@ catkin_package(
 ## Build ##
 ###########
 
+
+# Get all *.cpp files that Matlab Coder created
+FILE(GLOB matlab_sources_uwb_tracker src/codegen/TargetEstimationNominalBatch/*.cpp)
+
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include
+  src/codegen/TargetEstimationNominalBatch
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -90,6 +105,21 @@ include_directories(
 # add_library(position_pid
 #   src/${PROJECT_NAME}/position_pid.cpp
 # )
+
+
+## Declare a C++ executable
+add_executable(uwb_tracker_node src/nodes/uwb_tracker_node.cpp src/UWBTracker.cpp ${matlab_sources_uwb_tracker})
+
+## Add cmake target dependencies of the executable/library
+## as an example, message headers may need to be generated before nodes
+add_dependencies(uwb_tracker_node ${PROJECT_NAME}_generate_messages_cpp)
+
+
+## Specify libraries to link a library or executable target against
+target_link_libraries(uwb_tracker_node
+  ${catkin_LIBRARIES}
+)
+
 
 #############
 ## Install ##
