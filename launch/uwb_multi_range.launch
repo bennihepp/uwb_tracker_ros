@@ -1,0 +1,9 @@
+<launch>
+    <arg name="serial_port" default="/dev/ttyACM0" />
+    <arg name="baud_rate" default="115200" />
+    <node pkg="uwb" type="uwb_tracker_node.py" name="uwb_tracker_node" output="screen">
+        <param name="serial_port" value="$(arg serial_port)" />
+        <param name="baud_rate" value="$(arg baud_rate)" />
+        <param name="uwb_topic" value="/uwb/tracker" />
+    </node>
+</launch>

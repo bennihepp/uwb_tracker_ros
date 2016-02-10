@@ -55,6 +55,8 @@ add_message_files(
   FILES
   UWBRange.msg
   UWBRangeStats.msg
+  UWBMultiRange.msg
+  UWBMultiRangeRaw.msg
 )
 
 #add_service_files(
