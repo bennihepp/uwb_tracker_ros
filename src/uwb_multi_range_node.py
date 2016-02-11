@@ -147,19 +147,17 @@ class UWBMultiRange(object):
         for i in xrange(1, num_of_units):
             clock_offset, clock_skew = self.process_secondary_measurement(i, msg)
 
-            q = msg.timestamp_master_request_1[i] - clock_offset - self.unit_distance[i] \
-                                                                   / self.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT
-
-            timediff_primary_slave_primary = (msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0]) \
-                                / (1)
-            timediff_slave_primary_tmp = timediff_primary_slave_primary - adjusted_processing_time_slave_2
-            timediff_slave_primary = timediff_slave_primary_tmp - timediff_one_way
-            #timediff_slave_primary = timediff_primary_slave_primary - timediff_one_way - adjusted_processing_time_slave
-            tof_primary = self.convert_dw_timeunits_to_microseconds(timediff_slave_primary)
-            range_primary = self.convert_time_of_flight_to_distance(tof_primary)
+            # timediff_primary_slave_primary = (msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0]) \
+            #                     / (1)
+            # timediff_slave_primary_tmp = timediff_primary_slave_primary - adjusted_processing_time_slave_2
+            # timediff_slave_primary = timediff_slave_primary_tmp - timediff_one_way
+            # #timediff_slave_primary = timediff_primary_slave_primary - timediff_one_way - adjusted_processing_time_slave
+            # tof_primary = self.convert_dw_timeunits_to_microseconds(timediff_slave_primary)
+            # range_primary = self.convert_time_of_flight_to_distance(tof_primary)
 
             timediff_primary_slave_secondary = (msg.timestamp_slave_reply[i] - clock_offset - msg.timestamp_master_request_1[0]) \
                                 * (1 + clock_skew)
+            #
             timediff_slave_secondary = timediff_primary_slave_secondary - timediff_one_way - adjusted_processing_time_slave_2
             tof_secondary = self.convert_dw_timeunits_to_microseconds(timediff_slave_secondary)
             range_secondary = self.convert_time_of_flight_to_distance(tof_secondary)

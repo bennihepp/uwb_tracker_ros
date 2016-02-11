@@ -1,76 +1,47 @@
 /*
  * UWBTracker.h
  *
- * Simulates the functionality of the PxHawk FMU
+ * Tracker for multiple UWB ranging units.
  *
  *  Created on: Jan 12, 2016
- *      Author: nicolas
+ *      Author: tobias.naegeli@inf.ethz.ch
  */
 
-
-
-
-#ifndef UWB_SRC_UWBTRACKER_H_
-#define UWB_SRC_UWBTRACKER_H_
+#pragma once
 
 #include <ros/ros.h>
 
-
-
-#include <vector>
-#include <string>
-#include <stdio.h>
-
-
-
-
-
+#include "std_msgs/Float32MultiArray.h"
+#include <uwb/UWBRange.h>
+#include <uwb/UWBMultiRange.h>
+#include <uwb/UWBMultiRangeRaw.h>
 
 // matlab codegen includes
+#include "TargetEstimationNominalBatch/TargetEstimationNominalBatch_types.h"
 
-#include "rt_nonfinite.h"
-#include "rtwtypes.h"
-#include "rtGetInf.h"
-#include "rtGetNaN.h"
-#include "TargetEstimationNominalBatch.h"
-#include "TargetEstimationNominalBatch_types.h"
-#include "std_msgs/Float32MultiArray.h"
-
-#include <uwb/UWBRange.h>
-class UWBTracker {
-	ros::NodeHandle nh_;
-	int cnt;
-	 Params params;
-	 ros::Subscriber uwb_range_sub_;
-	//ros::Subscriber pose_sub_;
-	//ros::Subscriber force_sub_;
-	ros::Publisher StateVector_pub_;
-
-	std_msgs::Float32MultiArray uwb_state_msg_;
-	//bool odometry_available_;
-
-	//bool kumar_variant_;
-	//std::vector<double> K_rate_;
-	//std::vector<double> K_attitude_;
-
-	//std::vector<double> u_mot_;
-
-	//ros::Time last_force_msg_;
-
-	//dynamic_reconfigure::Server<mav_control::px_simConfig> dynamic_reconfigure_server_;
-
+class UWBTracker
+{
 public:
-	UWBTracker();
-	virtual ~UWBTracker();
-	void hello();
-	void estimate(const uwb::UWBRange& msg);
-	//void poseCb(const nav_msgs::Odometry& msg);
-//#ifdef MATLAB_COMPATIBLE
-//	void forceCb(const std_msgs::Float64MultiArray& msg);
-//#else
-//	void forceCb(const mavros::ControlSetpoint& msg);
-//#endif
-//	void dynamicReconfigureCb(mav_control::px_simConfig &config, uint32_t level);
-};
+  UWBTracker();
+  virtual ~UWBTracker();
 
-#endif /* UWB_SRC_UWBTRACKER_H_ */
+  // TODO
+//  void estimate(const uwb::UWBRange& msg);
+  void handle_multi_range(const uwb::UWBMultiRange& msg);
+  void handle_multi_range_raw(const uwb::UWBMultiRangeRaw& msg);
+
+private:
+  ros::NodeHandle nh_;
+  int cnt;
+  TargetEstimationParams target_estimation_params_;
+
+  ros::Subscriber uwb_range_sub_;
+  ros::Subscriber uwb_multi_range_sub_;
+  ros::Subscriber uwb_multi_range_raw_sub_;
+
+  ros::Publisher state_vector_pub_;
+  ros::Publisher uwb_multi_range_pub_;
+
+  uwb::UWBMultiRange uwb_multi_range_msg_;
+  std_msgs::Float32MultiArray uwb_state_msg_;
+};

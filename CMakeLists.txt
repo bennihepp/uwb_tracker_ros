@@ -9,7 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   cmake_modules
   geometry_msgs
-  mavros
   roscpp
   sensor_msgs
   std_msgs
@@ -99,14 +98,9 @@ FILE(GLOB matlab_sources_uwb_tracker src/codegen/TargetEstimationNominalBatch/*.
 # include_directories(include)
 include_directories(
   include
-  src/codegen/TargetEstimationNominalBatch
+  src/codegen
   ${catkin_INCLUDE_DIRS}
 )
-
-## Declare a cpp library
-# add_library(position_pid
-#   src/${PROJECT_NAME}/position_pid.cpp
-# )
 
 
 ## Declare a C++ executable

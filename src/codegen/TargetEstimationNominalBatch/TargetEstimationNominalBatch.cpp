@@ -5,7 +5,7 @@
 // File: TargetEstimationNominalBatch.cpp
 //
 // MATLAB Coder version            : 3.0
-// C/C++ source code generated on  : 08-Feb-2016 14:02:33
+// C/C++ source code generated on  : 11-Feb-2016 15:19:32
 //
 
 // Include Files
@@ -59,7 +59,7 @@ static float norm(const float b_x[3])
 //
 static void xgetrf(float A[16], int ipiv[4], int *info)
 {
-  int i2;
+  int i3;
   int j;
   int c;
   int iy;
@@ -69,8 +69,8 @@ static void xgetrf(float A[16], int ipiv[4], int *info)
   float s;
   int b_j;
   int ijA;
-  for (i2 = 0; i2 < 4; i2++) {
-    ipiv[i2] = 1 + i2;
+  for (i3 = 0; i3 < 4; i3++) {
+    ipiv[i3] = 1 + i3;
   }
 
   *info = 0;
@@ -102,8 +102,8 @@ static void xgetrf(float A[16], int ipiv[4], int *info)
         }
       }
 
-      i2 = (c - j) + 4;
-      for (iy = c + 1; iy + 1 <= i2; iy++) {
+      i3 = (c - j) + 4;
+      for (iy = c + 1; iy + 1 <= i3; iy++) {
         A[iy] /= A[c];
       }
     } else {
@@ -116,8 +116,8 @@ static void xgetrf(float A[16], int ipiv[4], int *info)
       smax = A[jy];
       if (A[jy] != 0.0F) {
         ix = c + 1;
-        i2 = (iy - j) + 8;
-        for (ijA = 5 + iy; ijA + 1 <= i2; ijA++) {
+        i3 = (iy - j) + 8;
+        for (ijA = 5 + iy; ijA + 1 <= i3; ijA++) {
           A[ijA] += A[ix] * -smax;
           ix++;
         }
@@ -137,14 +137,15 @@ static void xgetrf(float A[16], int ipiv[4], int *info)
 // UNTITLED Summary of this function goes here
 //    Detailed explanation goes here
 //  model
-// Arguments    : const float rangeArray[4]
-//                const Params *params
+// Arguments    : const float rangeArray_data[]
+//                const int rangeArray_size[2]
+//                const TargetEstimationParams *params
 //                const float pos_init[3]
 //                float x_out[6]
 // Return Type  : void
 //
-void TargetEstimationNominalBatch(const float rangeArray[4], const Params
-  *params, const float pos_init[3], float x_out[6])
+void TargetEstimationNominalBatch(const float rangeArray_data[], const int [2],
+  const TargetEstimationParams *params, const float pos_init[3], float x_out[6])
 {
   int i0;
   static const signed char iv0[36] = { 10, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0,
@@ -291,10 +292,10 @@ void TargetEstimationNominalBatch(const float rangeArray[4], const Params
     pos[ia] = x[ia];
   }
 
-  InitialRangeArray[0] = rangeArray[0];
-  InitialRangeArray[1] = rangeArray[1];
-  InitialRangeArray[2] = rangeArray[2];
-  InitialRangeArray[3] = rangeArray[3];
+  InitialRangeArray[0] = rangeArray_data[0];
+  InitialRangeArray[1] = rangeArray_data[1];
+  InitialRangeArray[2] = rangeArray_data[2];
+  InitialRangeArray[3] = rangeArray_data[3];
   K_size_idx_0 = 4;
   K_size_idx_1 = 6;
   memset(&K_data[0], 0, 24U * sizeof(float));
@@ -561,6 +562,46 @@ void TargetEstimationNominalBatch_initialize()
 void TargetEstimationNominalBatch_terminate()
 {
   // (no terminate code required)
+}
+
+//
+// %#codegen
+// Arguments    : unsigned char num_of_units
+//                unsigned long timestamp_master_request_1_recv
+//                unsigned long timestamp_slave_reply_send
+//                unsigned long timestamp_master_request_2_recv
+//                const unsigned long c_timestamp_master_request_1_ar[]
+//                const int d_timestamp_master_request_1_ar[2]
+//                const unsigned long c_timestamp_slave_reply_array_d[]
+//                const int c_timestamp_slave_reply_array_s[2]
+//                const unsigned long c_timestamp_master_request_2_ar[]
+//                const int d_timestamp_master_request_2_ar[2]
+//                float tofs_data[]
+//                int tofs_size[2]
+//                float ranges_data[]
+//                int ranges_size[2]
+// Return Type  : void
+//
+void UWBMultiRangeEstimation(unsigned char num_of_units, unsigned long, unsigned
+  long, unsigned long, const unsigned long [], const int [2], const unsigned
+  long [], const int [2], const unsigned long [], const int [2], float
+  tofs_data[], int tofs_size[2], float ranges_data[], int ranges_size[2])
+{
+  int loop_ub;
+  int i2;
+  tofs_size[0] = 1;
+  tofs_size[1] = num_of_units;
+  loop_ub = num_of_units;
+  for (i2 = 0; i2 < loop_ub; i2++) {
+    tofs_data[i2] = 0.0F;
+  }
+
+  ranges_size[0] = 1;
+  ranges_size[1] = num_of_units;
+  loop_ub = num_of_units;
+  for (i2 = 0; i2 < loop_ub; i2++) {
+    ranges_data[i2] = 0.0F;
+  }
 }
 
 //

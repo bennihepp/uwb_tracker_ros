@@ -5,7 +5,7 @@
 // File: TargetEstimationNominalBatch_types.h
 //
 // MATLAB Coder version            : 3.0
-// C/C++ source code generated on  : 08-Feb-2016 14:02:33
+// C/C++ source code generated on  : 11-Feb-2016 15:19:32
 //
 #ifndef __TARGETESTIMATIONNOMINALBATCH_TYPES_H__
 #define __TARGETESTIMATIONNOMINALBATCH_TYPES_H__
@@ -28,7 +28,7 @@ typedef struct {
   float UWB3p1;
   float UWB4p0;
   float UWB4p1;
-} Params;
+} TargetEstimationParams;
 
 #endif
 

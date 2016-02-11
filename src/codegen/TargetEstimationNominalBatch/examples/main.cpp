@@ -5,7 +5,7 @@
 // File: main.cpp
 //
 // MATLAB Coder version            : 3.0
-// C/C++ source code generated on  : 08-Feb-2016 14:02:33
+// C/C++ source code generated on  : 11-Feb-2016 15:19:32
 //
 
 //***********************************************************************
@@ -38,27 +38,61 @@
 #include "main.h"
 
 // Function Declarations
-static void argInit_1x4_real32_T(float result[4]);
+static void argInit_1xd255_real32_T(float result_data[], int result_size[2]);
+static void argInit_1xd255_uint64_T(unsigned long result_data[], int
+  result_size[2]);
 static void argInit_3x1_real32_T(float result[3]);
-static void argInit_Params(Params *result);
+static void argInit_TargetEstimationParams(TargetEstimationParams *result);
 static float argInit_real32_T();
+static unsigned long argInit_uint64_T();
+static unsigned char argInit_uint8_T();
 static void c_main_TargetEstimationNominalB();
+static void main_UWBMultiRangeEstimation();
 
 // Function Definitions
 
 //
-// Arguments    : float result[4]
+// Arguments    : float result_data[]
+//                int result_size[2]
 // Return Type  : void
 //
-static void argInit_1x4_real32_T(float result[4])
+static void argInit_1xd255_real32_T(float result_data[], int result_size[2])
 {
   int idx1;
 
+  // Set the size of the array.
+  // Change this size to the value that the application requires.
+  result_size[0] = 1;
+  result_size[1] = 2;
+
   // Loop over the array to initialize each element.
-  for (idx1 = 0; idx1 < 4; idx1++) {
+  for (idx1 = 0; idx1 < 2; idx1++) {
     // Set the value of the array element.
     // Change this value to the value that the application requires.
-    result[idx1] = argInit_real32_T();
+    result_data[idx1] = argInit_real32_T();
+  }
+}
+
+//
+// Arguments    : unsigned long result_data[]
+//                int result_size[2]
+// Return Type  : void
+//
+static void argInit_1xd255_uint64_T(unsigned long result_data[], int
+  result_size[2])
+{
+  int idx1;
+
+  // Set the size of the array.
+  // Change this size to the value that the application requires.
+  result_size[0] = 1;
+  result_size[1] = 2;
+
+  // Loop over the array to initialize each element.
+  for (idx1 = 0; idx1 < 2; idx1++) {
+    // Set the value of the array element.
+    // Change this value to the value that the application requires.
+    result_data[idx1] = argInit_uint64_T();
   }
 }
 
@@ -79,10 +113,10 @@ static void argInit_3x1_real32_T(float result[3])
 }
 
 //
-// Arguments    : Params *result
+// Arguments    : TargetEstimationParams *result
 // Return Type  : void
 //
-static void argInit_Params(Params *result)
+static void argInit_TargetEstimationParams(TargetEstimationParams *result)
 {
   // Set the value of each structure field.
   // Change this value to the value that the application requires.
@@ -112,24 +146,92 @@ static float argInit_real32_T()
 
 //
 // Arguments    : void
+// Return Type  : unsigned long
+//
+static unsigned long argInit_uint64_T()
+{
+  return 0UL;
+}
+
+//
+// Arguments    : void
+// Return Type  : unsigned char
+//
+static unsigned char argInit_uint8_T()
+{
+  return 0;
+}
+
+//
+// Arguments    : void
 // Return Type  : void
 //
 static void c_main_TargetEstimationNominalB()
 {
-  float fv2[4];
-  Params r0;
-  float fv3[3];
+  int rangeArray_size[2];
+  float rangeArray_data[255];
+  TargetEstimationParams r0;
+  float fv2[3];
   float x_out[6];
 
   // Initialize function 'TargetEstimationNominalBatch' input arguments.
   // Initialize function input argument 'rangeArray'.
+  argInit_1xd255_real32_T(rangeArray_data, rangeArray_size);
+
   // Initialize function input argument 'params'.
   // Initialize function input argument 'pos_init'.
   // Call the entry-point 'TargetEstimationNominalBatch'.
-  argInit_1x4_real32_T(fv2);
-  argInit_Params(&r0);
-  argInit_3x1_real32_T(fv3);
-  TargetEstimationNominalBatch(fv2, &r0, fv3, x_out);
+  argInit_TargetEstimationParams(&r0);
+  argInit_3x1_real32_T(fv2);
+  TargetEstimationNominalBatch(rangeArray_data, rangeArray_size, &r0, fv2, x_out);
+}
+
+//
+// Arguments    : void
+// Return Type  : void
+//
+static void main_UWBMultiRangeEstimation()
+{
+  unsigned char num_of_units;
+  unsigned long timestamp_master_request_1_recv;
+  unsigned long timestamp_slave_reply_send;
+  unsigned long timestamp_master_request_2_recv;
+  int c_timestamp_master_request_1_ar[2];
+  unsigned long d_timestamp_master_request_1_ar[255];
+  int c_timestamp_slave_reply_array_s[2];
+  unsigned long c_timestamp_slave_reply_array_d[255];
+  int c_timestamp_master_request_2_ar[2];
+  unsigned long d_timestamp_master_request_2_ar[255];
+  int ranges_size[2];
+  float ranges_data[255];
+  int tofs_size[2];
+  float tofs_data[255];
+
+  // Initialize function 'UWBMultiRangeEstimation' input arguments.
+  num_of_units = argInit_uint8_T();
+  timestamp_master_request_1_recv = argInit_uint64_T();
+  timestamp_slave_reply_send = argInit_uint64_T();
+  timestamp_master_request_2_recv = argInit_uint64_T();
+
+  // Initialize function input argument 'timestamp_master_request_1_array'.
+  argInit_1xd255_uint64_T(d_timestamp_master_request_1_ar,
+    c_timestamp_master_request_1_ar);
+
+  // Initialize function input argument 'timestamp_slave_reply_array'.
+  argInit_1xd255_uint64_T(c_timestamp_slave_reply_array_d,
+    c_timestamp_slave_reply_array_s);
+
+  // Initialize function input argument 'timestamp_master_request_2_array'.
+  argInit_1xd255_uint64_T(d_timestamp_master_request_2_ar,
+    c_timestamp_master_request_2_ar);
+
+  // Call the entry-point 'UWBMultiRangeEstimation'.
+  UWBMultiRangeEstimation(num_of_units, timestamp_master_request_1_recv,
+    timestamp_slave_reply_send, timestamp_master_request_2_recv,
+    d_timestamp_master_request_1_ar, c_timestamp_master_request_1_ar,
+    c_timestamp_slave_reply_array_d, c_timestamp_slave_reply_array_s,
+    d_timestamp_master_request_2_ar, c_timestamp_master_request_2_ar, tofs_data,
+    tofs_size, ranges_data, ranges_size);
 }
 
 //
@@ -146,6 +248,7 @@ int main(int, const char * const [])
   // Invoke the entry-point functions.
   // You can call entry-point functions multiple times.
   c_main_TargetEstimationNominalB();
+  main_UWBMultiRangeEstimation();
 
   // Terminate the application.
   // You do not need to do this more than one time.

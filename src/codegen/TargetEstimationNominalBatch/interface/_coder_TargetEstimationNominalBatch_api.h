@@ -5,7 +5,7 @@
  * File: _coder_TargetEstimationNominalBatch_api.h
  *
  * MATLAB Coder version            : 3.0
- * C/C++ source code generated on  : 08-Feb-2016 14:02:33
+ * C/C++ source code generated on  : 11-Feb-2016 15:19:32
  */
 
 #ifndef ___CODER_TARGETESTIMATIONNOMINALBATCH_API_H__
@@ -20,8 +20,8 @@
 #include "_coder_TargetEstimationNominalBatch_api.h"
 
 /* Type Definitions */
-#ifndef typedef_Params
-#define typedef_Params
+#ifndef typedef_TargetEstimationParams
+#define typedef_TargetEstimationParams
 
 typedef struct {
   real32_T tracker_mean[3];
@@ -37,23 +37,34 @@ typedef struct {
   real32_T UWB3p1;
   real32_T UWB4p0;
   real32_T UWB4p1;
-} Params;
+} TargetEstimationParams;
 
-#endif                                 /*typedef_Params*/
+#endif                                 /*typedef_TargetEstimationParams*/
 
 /* Variable Declarations */
 extern emlrtCTX emlrtRootTLSGlobal;
 extern emlrtContext emlrtContextGlobal;
 
 /* Function Declarations */
-extern void TargetEstimationNominalBatch(real32_T rangeArray[4], Params *params,
-  real32_T pos_init[3], real32_T x_out[6]);
+extern void TargetEstimationNominalBatch(real32_T rangeArray_data[], int32_T
+  rangeArray_size[2], TargetEstimationParams *params, real32_T pos_init[3],
+  real32_T x_out[6]);
 extern void TargetEstimationNominalBatch_api(const mxArray * const prhs[3],
   const mxArray *plhs[1]);
 extern void TargetEstimationNominalBatch_atexit(void);
 extern void TargetEstimationNominalBatch_initialize(void);
 extern void TargetEstimationNominalBatch_terminate(void);
 extern void TargetEstimationNominalBatch_xil_terminate(void);
+extern void UWBMultiRangeEstimation(uint8_T num_of_units, uint64_T
+  timestamp_master_request_1_recv, uint64_T timestamp_slave_reply_send, uint64_T
+  timestamp_master_request_2_recv, uint64_T c_timestamp_master_request_1_ar[],
+  int32_T d_timestamp_master_request_1_ar[2], uint64_T
+  c_timestamp_slave_reply_array_d[], int32_T c_timestamp_slave_reply_array_s[2],
+  uint64_T c_timestamp_master_request_2_ar[], int32_T
+  d_timestamp_master_request_2_ar[2], real32_T tofs_data[], int32_T tofs_size[2],
+  real32_T ranges_data[], int32_T ranges_size[2]);
+extern void UWBMultiRangeEstimation_api(const mxArray *prhs[7], const mxArray
+  *plhs[2]);
 
 #endif
 
