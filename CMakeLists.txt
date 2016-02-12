@@ -90,7 +90,7 @@ catkin_package(
 
 
 # Get all *.cpp files that Matlab Coder created
-FILE(GLOB matlab_sources_uwb_tracker src/codegen/TargetEstimationNominalBatch/*.cpp)
+FILE(GLOB matlab_sources_uwb_tracker src/codegen/MultiRangeEstimation/*.cpp)
 
 
 ## Specify additional locations of header files

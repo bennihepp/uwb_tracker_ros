@@ -65,6 +65,9 @@ class UWBDummyPublisher(object):
             ros_msg.num_of_units = 4
             ros_msg.address = address
             ros_msg.remote_address = remote_address
+            ros_msg.timestamp_master_request_1 = [1, 1, 1, 1]
+            ros_msg.timestamp_slave_reply = [1, 1, 1, 1]
+            ros_msg.timestamp_master_request_2 = [1, 1, 1, 1]
             self.uwb_multi_range_raw_pub.publish(ros_msg)
 
 

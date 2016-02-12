@@ -16,8 +16,8 @@
 #include <uwb/UWBMultiRange.h>
 #include <uwb/UWBMultiRangeRaw.h>
 
-// matlab codegen includes
-#include "TargetEstimationNominalBatch/TargetEstimationNominalBatch_types.h"
+// Matlab codegen includes
+#include "MultiRangeEstimation/MultiRangeEstimation_types.h"
 
 class UWBTracker
 {
@@ -25,15 +25,18 @@ public:
   UWBTracker();
   virtual ~UWBTracker();
 
-  // TODO
-//  void estimate(const uwb::UWBRange& msg);
-  void handle_multi_range(const uwb::UWBMultiRange& msg);
-  void handle_multi_range_raw(const uwb::UWBMultiRangeRaw& msg);
+  void handleMultiRange(const uwb::UWBMultiRange& msg);
+  void handleMultiRangeRaw(const uwb::UWBMultiRangeRaw& msg);
 
 private:
+  typedef double scalar_type;
+
+  void initializeMultiRangeEstimationParameters();
+
   ros::NodeHandle nh_;
-  int cnt;
+
   TargetEstimationParams target_estimation_params_;
+  MultiRangeEstimationParams multi_range_estimation_params_;
 
   ros::Subscriber uwb_range_sub_;
   ros::Subscriber uwb_multi_range_sub_;

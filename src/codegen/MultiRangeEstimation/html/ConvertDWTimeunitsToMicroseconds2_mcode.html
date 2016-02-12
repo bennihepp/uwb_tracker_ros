@@ -1,0 +1,16 @@
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,170" id="srcline170">170</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,171" id="srcline171">171</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,172" id="srcline172">172</a></span><span class="line"><span class="comment">%% Convert DW timeunit into microseconds</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,173" id="srcline173">173</a></span><span class="line"><span class="keyword">function</span> <span class="var type1" id="S76T3U436">microseconds</span> = ConvertDWTimeunitsToMicroseconds(<span class="var type1" id="S77T3U439">dw_timeunits</span>, <span class="var type1" id="S78T4U440">params</span>)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,174" id="srcline174">174</a></span><span class="line">    <span class="mxinfo " id="T3:U4"><span class="var type1" id="S76T3U443">microseconds</span> = <span class="mxinfo " id="T3:U6">double(<span class="var type1" id="S77T3U447">dw_timeunits</span>) * <span class="mxinfo " id="T3:U8"><span class="var type1" id="S78T4U449">params</span>.DW_TIMEUNITS_TO_US</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,175" id="srcline175">175</a></span><span class="line"><span class="comment">%     if ~coder.target('MATLAB')</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,176" id="srcline176">176</a></span><span class="line"><span class="comment">%         coder.ceval('printf', ['dw_timeunits: %f\n' 10 0], dw_timeunits);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,177" id="srcline177">177</a></span><span class="line"><span class="comment">%         coder.ceval('printf', ['microseconds: %f\n' 10 0], microseconds);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,178" id="srcline178">178</a></span><span class="line"><span class="comment">%         coder.ceval('printf', ['DW_TIMEUNITS_TO_US: %f\n' 10 0], params.DW_TIMEUNITS_TO_US);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,179" id="srcline179">179</a></span><span class="line"><span class="comment">%     end</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,180" id="srcline180">180</a></span><span class="line"><span class="keyword">end</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,181" id="srcline181">181</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,182" id="srcline182">182</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,183" id="srcline183">183</a></span><span class="line"><span class="comment">%% Convert microseconds time-of-flight into distance</span></span></span>
+</pre>
