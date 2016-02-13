@@ -43,7 +43,7 @@ class UWBMavlink(object):
         try:
             msg = self.mav.try_receive_message()
             if msg is not None:
-                if msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_TRACKER_RAW_4:
+                if msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_2WAY_MULTI_RANGE_RAW_4:
                     #print("UWB multi range raw: {}".format(msg))
 
                     ros_msg = uwb.msg.UWBMultiRangeRaw()
@@ -58,8 +58,10 @@ class UWBMavlink(object):
                     ros_msg.timestamp_slave_reply = msg.timestamp_slave_reply
                     ros_msg.timestamp_master_request_2 = msg.timestamp_master_request_2
                     self.uwb_pub.publish(ros_msg)
+                elif msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_STATUS:
+                    print("STATUS: {}".format(msg.description))
 
-                    self.msg_count += 1
+                self.msg_count += 1
 
             now = rospy.get_time()
             if now - self.last_now >= self.INFO_PRINT_RATE:

@@ -30,8 +30,16 @@ public:
 
 private:
   typedef double scalar_type;
-
-  void initializeMultiRangeEstimationParameters();
+  struct UnitParameter {
+    scalar_type x;
+    scalar_type y;
+    scalar_type z;
+    scalar_type p0;
+    scalar_type p1;
+  };
+  std::vector<UnitParameter> getUnitParameters();
+  void loadTargetEstimationParameters();
+  void loadMultiRangeEstimationParameters();
 
   ros::NodeHandle nh_;
 

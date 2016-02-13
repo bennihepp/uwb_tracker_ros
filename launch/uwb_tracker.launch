@@ -1,4 +1,5 @@
 <launch>
-  <node name="uwb_tracker" pkg="uwb" type="uwb_tracker_node" output="screen" />
+  <node name="uwb_tracker" pkg="uwb" type="uwb_tracker_node" output="screen">
+    <rosparam command="load" file="$(find uwb)/config/params_pyramid.yaml" />
+  </node>
 </launch>
-

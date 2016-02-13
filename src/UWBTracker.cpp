@@ -7,47 +7,22 @@
  *      Author: tobias.naegeli@inf.ethz.ch
  */
 
-#include "UWBTracker.h"
+#include <stdexcept>
+#include <vector>
+#include <sstream>
+#include <cmath>
 
 // matlab codegen includes
 #include "MultiRangeEstimation/MultiRangeEstimation.h"
+
+#include "UWBTracker.h"
 
 
 UWBTracker::UWBTracker()
 : nh_("~")
 {
-  target_estimation_params_.tracker_mean[0]=1;
-  target_estimation_params_.tracker_mean[1]=1;
-  target_estimation_params_.tracker_mean[2]=1;
-  target_estimation_params_.m_uwb1[0]=1;
-  target_estimation_params_.m_uwb1[0]=1;
-  target_estimation_params_.m_uwb1[0]=1;
-
-  target_estimation_params_.m_uwb2[0]=1;
-  target_estimation_params_.m_uwb2[0]=1;
-  target_estimation_params_.m_uwb2[0]=1;
-
-  target_estimation_params_.m_uwb3[0]=1;
-  target_estimation_params_.m_uwb3[0]=1;
-  target_estimation_params_.m_uwb3[0]=1;
-
-  target_estimation_params_.m_uwb4[0]=1;
-  target_estimation_params_.m_uwb4[0]=1;
-  target_estimation_params_.m_uwb4[0]=1;
-
-  target_estimation_params_.UWB1p0=0;
-  target_estimation_params_.UWB1p1=1;
-
-  target_estimation_params_.UWB2p0=0;
-  target_estimation_params_.UWB2p1=1;
-
-  target_estimation_params_.UWB3p0=0;
-  target_estimation_params_.UWB3p1=1;
-
-  target_estimation_params_.UWB4p0=0;
-  target_estimation_params_.UWB4p1=1;
-
-  initializeMultiRangeEstimationParameters();
+  loadTargetEstimationParameters();
+  loadMultiRangeEstimationParameters();
 
   state_vector_pub_ = nh_.advertise<std_msgs::Float32MultiArray>("/uwb/tracker_state", 10);
   uwb_multi_range_pub_ = nh_.advertise<uwb::UWBMultiRange>("/uwb/multi_range", 10);
@@ -64,8 +39,80 @@ UWBTracker::~UWBTracker() {
   MultiRangeEstimation_terminate();
 }
 
-void UWBTracker::initializeMultiRangeEstimationParameters()
+std::vector<UWBTracker::UnitParameter> UWBTracker::getUnitParameters() {
+  int num_of_units;
+  if (!nh_.getParam("num_of_units", num_of_units)) {
+    throw std::runtime_error("Parameter 'num_of_units' is required but was not set");
+  }
+
+  // Read unit model
+  std::vector<UnitParameter> unit_parameters;
+  for (int i = 0; i < num_of_units; ++i) {
+    std::ostringstream unit_name;
+    unit_name << "unit_" << i;
+    std::map<std::string, scalar_type> param_map;
+    if (!nh_.getParam(unit_name.str(), param_map)) {
+      std::ostringstream error_msg;
+      error_msg << "Parameter '" << unit_name.str() << "' is required but was not set";
+      throw std::runtime_error(error_msg.str());
+    }
+    assert(param_map.find("x") != param_map.end());
+    assert(param_map.find("y") != param_map.end());
+    assert(param_map.find("z") != param_map.end());
+    assert(param_map.find("p0") != param_map.end());
+    assert(param_map.find("p1") != param_map.end());
+    UnitParameter unit_parameter;
+    unit_parameter.x = param_map["x"];
+    unit_parameter.y = param_map["y"];
+    unit_parameter.z = param_map["z"];
+    unit_parameter.p0 = param_map["p0"];
+    unit_parameter.p1 = param_map["p1"];
+    unit_parameters.push_back(unit_parameter);
+  }
+  return unit_parameters;
+}
+
+void UWBTracker::loadTargetEstimationParameters()
 {
+  std::vector<UnitParameter> unit_parameters = UWBTracker::getUnitParameters();
+
+  target_estimation_params_.m_uwb1[0] = unit_parameters[0].x;
+  target_estimation_params_.m_uwb1[1] = unit_parameters[0].y;
+  target_estimation_params_.m_uwb1[2] = unit_parameters[0].z;
+
+  target_estimation_params_.m_uwb2[0] = unit_parameters[1].x;
+  target_estimation_params_.m_uwb2[1] = unit_parameters[1].y;
+  target_estimation_params_.m_uwb2[2] = unit_parameters[1].z;
+
+  target_estimation_params_.m_uwb3[0] = unit_parameters[2].x;
+  target_estimation_params_.m_uwb3[1] = unit_parameters[2].y;
+  target_estimation_params_.m_uwb3[2] = unit_parameters[2].z;
+
+  target_estimation_params_.m_uwb4[0] = unit_parameters[3].x;
+  target_estimation_params_.m_uwb4[0] = unit_parameters[3].y;
+  target_estimation_params_.m_uwb4[0] = unit_parameters[3].z;
+
+  target_estimation_params_.UWB1p0 = unit_parameters[0].p0;
+  target_estimation_params_.UWB1p1 = unit_parameters[0].p1;
+
+  target_estimation_params_.UWB2p0 = unit_parameters[1].p0;
+  target_estimation_params_.UWB2p1 = unit_parameters[1].p1;
+
+  target_estimation_params_.UWB3p0 = unit_parameters[2].p0;
+  target_estimation_params_.UWB3p1 = unit_parameters[2].p1;
+
+  target_estimation_params_.UWB4p0 = unit_parameters[3].p0;
+  target_estimation_params_.UWB4p1 = unit_parameters[3].p1;
+
+  // TODO: Remove
+//  target_estimation_params_.tracker_mean[0]=1;
+//  target_estimation_params_.tracker_mean[1]=1;
+//  target_estimation_params_.tracker_mean[2]=1;
+}
+
+void UWBTracker::loadMultiRangeEstimationParameters()
+{
+  // Set constants
   scalar_type US_TO_DW_TIMEUNITS = 128. * 499.2;
   scalar_type DW_TIMEUNITS_TO_US = 1 / US_TO_DW_TIMEUNITS;
   scalar_type SPEED_OF_LIGHT_IN_M_PER_US = 299.792458;
@@ -76,13 +123,18 @@ void UWBTracker::initializeMultiRangeEstimationParameters()
   multi_range_estimation_params_.SPEED_OF_LIGHT_IN_M_PER_US = SPEED_OF_LIGHT_IN_M_PER_US;
   multi_range_estimation_params_.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT = SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT;
 
-  // TODO: How to properly initialize unit distances
-  multi_range_estimation_params_.unit_distances.data[0] = 0;
-  multi_range_estimation_params_.unit_distances.data[1] = 0.37;
-  multi_range_estimation_params_.unit_distances.data[2] = 0.37;
-  multi_range_estimation_params_.unit_distances.data[3] = 0.37;
+  std::vector<UnitParameter> unit_parameters = UWBTracker::getUnitParameters();
+  // Compute distances of secondary units (> 0) to master unit (0)
   multi_range_estimation_params_.unit_distances.size[0] = 1;
-  multi_range_estimation_params_.unit_distances.size[1] = 4;
+  multi_range_estimation_params_.unit_distances.size[1] = unit_parameters.size();
+  multi_range_estimation_params_.unit_distances.data[0] = 0;
+  for (int i = 0; i < unit_parameters.size(); ++i) {
+    scalar_type dx = unit_parameters[i].x - unit_parameters[0].x;
+    scalar_type dy = unit_parameters[i].y - unit_parameters[0].y;
+    scalar_type dz = unit_parameters[i].z - unit_parameters[0].z;
+    scalar_type distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+    multi_range_estimation_params_.unit_distances.data[i] = std::sqrt(distance);
+  }
 }
 
 void UWBTracker::handleMultiRange(const uwb::UWBMultiRange& msg)
