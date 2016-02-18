@@ -86,13 +86,14 @@ def main():
     print("Reading from serial port {} with baud-rate {}".format(serial_port, baud_rate))
     print("Publishing to {}".format(topic))
 
-    um = UWBMavlink(serial_port, baud_rate, topic)
     try:
+        um = UWBMavlink(serial_port, baud_rate, topic)
         um.run()
     except (rospy.ROSInterruptException, select.error):
         print("Interrupted... Stopping.")
+    except serial.serialutil.SerialException, e:
+        print("Problem with serial port: {}".format(e))
 
 
 if __name__ == '__main__':
     main()
-
