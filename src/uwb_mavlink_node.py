@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""uwb_mavlink_node.py: Streams raw UWB multi-range measurements read from serial port."""
+"""uwb_mavlink_node.py: Streams UWB multi-range timestamps read from serial port."""
 
 __author__      = "Benjamin Hepp"
 __email__ = "benjamin.hepp@inf.ethz.ch"
@@ -19,7 +19,7 @@ import mavlink_bridge
 
 class UWBMavlink(object):
 
-    INFO_PRINT_RATE = 5
+    INFO_PRINT_RATE = 2
 
     def __init__(self, serial_port, baud_rate, topic):
         self.ser = serial.Serial(serial_port, baud_rate, timeout=0)
@@ -82,7 +82,7 @@ def main():
 
     serial_port = rospy.get_param('~serial_port', '/dev/ttyACM0')
     baud_rate = int(rospy.get_param('~baud_rate', "115200"))
-    topic = rospy.get_param('~topic', '/uwb/multi_range_raw')
+    topic = rospy.get_param('~topic', '/uwb/timestamps')
     print("Reading from serial port {} with baud-rate {}".format(serial_port, baud_rate))
     print("Publishing to {}".format(topic))
 

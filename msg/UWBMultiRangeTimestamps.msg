@@ -1,0 +1,10 @@
+Header header
+uint8 num_of_units
+uint8 address
+uint8 remote_address
+int64 timestamp_master_request_1_recv
+int64 timestamp_slave_reply_send
+int64 timestamp_master_request_2_recv
+int64[] timestamp_master_request_1
+int64[] timestamp_slave_reply
+int64[] timestamp_master_request_2

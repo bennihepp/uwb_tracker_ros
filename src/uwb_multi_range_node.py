@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""uwb_range.py: Streams UWB range measurements from serial port."""
+"""uwb_multi_range_node.py: Streams UWB multi-range measurements based on UWB timestamps."""
 
 __author__      = "Benjamin Hepp"
 __email__ = "benjamin.hepp@inf.ethz.ch"
@@ -17,7 +17,7 @@ import pyqtgraph
 from pyqtgraph.Qt import QtGui, QtCore
 
 import uwb.msg
-import mavlink_bridge
+
 
 class DataPlot(object):
 
@@ -71,7 +71,7 @@ class MainWindow(pyqtgraph.GraphicsWindow):
 
 class UWBMultiRange(object):
 
-    INFO_PRINT_RATE = 5
+    INFO_PRINT_RATE = 2
 
     US_TO_DW_TIMEUNITS = 128. * 499.2  # conversion between microseconds to the decawave timeunits (ca 15.65ps).
     DW_TIMEUNITS_TO_US = 1 / US_TO_DW_TIMEUNITS  # conversion between the decawave timeunits (~15.65ps) to microseconds.
@@ -82,19 +82,22 @@ class UWBMultiRange(object):
     VISUALIZATION_DATA_LENGTH = 500
     unit_distance = [0, 0.37, 0.37, 0.37]
 
-    def __init__(self, serial_port, baud_rate, uwb_topic, uwb_raw_topic = None):
-        if uwb_raw_topic is None:
-            uwb_raw_topic = '{}_raw'.format(uwb_topic)
-        self.ser = serial.Serial(serial_port, baud_rate, timeout=0)
-        self.uwb_pub = rospy.Publisher(uwb_topic, uwb.msg.UWBMultiRange, queue_size=1)
-        self.uwb_raw_pub = rospy.Publisher(uwb_raw_topic, uwb.msg.UWBMultiRangeRaw, queue_size=1)
-        self.mav = mavlink_bridge.MAVLinkBridge(self.ser)
-        self.mav_error_handler = None
+    def __init__(self, uwb_multi_range_topic, uwb_multi_range_raw_topic, uwb_timestamps_topic, show_plots):
+        # ROS Publishers
+        self.uwb_pub = rospy.Publisher(uwb_multi_range_topic, uwb.msg.UWBMultiRange, queue_size=1)
+        self.uwb_raw_pub = rospy.Publisher(uwb_multi_range_raw_topic, uwb.msg.UWBMultiRange, queue_size=1)
+        self.uwb_timestamps_sub = rospy.Subscriber(uwb_timestamps_topic, uwb.msg.UWBMultiRangeTimestamps,
+                                                   self.handle_timestamps_message)
+
+        # Variables for rate display
         self.msg_count = 0
         self.last_now = rospy.get_time()
-        timer = QtCore.QTimer()
-        timer.timeout.connect(self.step)
-        timer.setInterval(1)
+
+        self.show_plots = show_plots
+        if show_plots:
+            self._setup_plots()
+
+    def _setup_plots(self):
         self.window = MainWindow(timer)
         self.range_plot = DataPlot(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
         self.range_plot.get_plot().addLegend()
@@ -105,8 +108,44 @@ class UWBMultiRange(object):
         self.clock_skew_plot = DataPlot(self.window.addPlot(title="Clock skew"), self.VISUALIZATION_DATA_LENGTH)
         self.clock_skew_plot.get_plot().addLegend()
 
-    def set_mavlink_error_handler(self, error_handler):
-        self.mav_error_handler = error_handler
+    def handle_timestamps_message(self, multi_range_raw_msg):
+        # Compute time-of-flight and ranges from timestamps measurements
+        tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew \
+            = self.process_timestamps_measurements(multi_range_raw_msg, self.unit_distance)
+
+        # Publish multi-range message
+        ros_msg = uwb.msg.UWBMultiRange()
+        ros_msg.header.stamp = rospy.Time.now()
+        ros_msg.num_of_units = msg.num_of_units
+        ros_msg.address = msg.address
+        ros_msg.remote_address = msg.remote_address
+        ros_msg.tofs = tofs
+        ros_msg.ranges = ranges
+        self.uwb_pub.publish(ros_msg)
+
+        # Compute raw (without rigid configuration model) time-of-flight and ranges from timestamps measurements
+        raw_tofs, raw_ranges, _, _, _, _ \
+            = self.process_timestamps_measurements(multi_range_raw_msg, [0.0] * msg.num_of_units)
+
+        ros_msg.tofs = raw_tofs
+        ros_msg.ranges = raw_ranges
+        self.uwb_raw_pub.publish(ros_msg)
+
+        # Optionally: Update plots
+        if self.show_plots:
+            self.update_visualization(tofs, ranges, clock_offsets, clock_skews,
+                                      slave_clock_offset, slave_clock_skew)
+
+        # Increase rate-counter
+        self.msg_count += 1
+
+        # Display rate
+        now = rospy.get_time()
+        if now - self.last_now >= self.INFO_PRINT_RATE:
+            msg_rate = self.msg_count / (now - self.last_now)
+            rospy.loginfo("Receiving MAVLink messages with rate {} Hz".format(msg_rate))
+            self.last_now = now
+            self.msg_count = 0
 
     def convert_dw_timeunits_to_microseconds(self, dw_timeunits):
         return dw_timeunits * self.DW_TIMEUNITS_TO_US
@@ -114,7 +153,7 @@ class UWBMultiRange(object):
     def convert_time_of_flight_to_distance(self, tof):
         return self.SPEED_OF_LIGHT_IN_M_PER_US * tof
 
-    def process_raw_measurements(self, uwb_multi_range_raw_msg):
+    def process_timestamps_measurements(self, uwb_multi_range_raw_msg, unit_distance):
         msg = uwb_multi_range_raw_msg
         num_of_units = msg.num_of_units
 
@@ -128,55 +167,51 @@ class UWBMultiRange(object):
 
         timediff_master = 2 * msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0] \
                           - msg.timestamp_master_request_2[0]
-        timediff_one_way = (timediff_master + timediff_slave) / 4.0
-        tof = self.convert_dw_timeunits_to_microseconds(timediff_one_way)
-        range = self.convert_time_of_flight_to_distance(tof)
+        tof_master_slave = (timediff_master + timediff_slave) / 4.0
+        tof_master_slave_us = self.convert_dw_timeunits_to_microseconds(tof_master_slave)
+        range_master_slave = self.convert_time_of_flight_to_distance(tof_master_slave_us)
 
-        tofs.append(tof)
-        ranges.append(range)
+        tofs.append(tof_master_slave_us)
+        ranges.append(range_master_slave)
         clock_offsets.append(0.0)
         clock_skews.append(0.0)
 
-        slave_clock_offset, slave_clock_skew = self.process_slave_measurement(range, msg)
-        adjusted_processing_time_slave = float(msg.timestamp_slave_reply_send - msg.timestamp_master_request_1_recv) \
-                                         / (1 + slave_clock_skew)
-        adjusted_processing_time_slave_us = self.convert_dw_timeunits_to_microseconds(adjusted_processing_time_slave)
-        adjusted_processing_time_slave_2 = (msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0]) \
-                                           - 2 * timediff_one_way
+        adjusted_processing_time_slave = (msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0]) \
+                                         - 2 * tof_master_slave
 
         for i in xrange(1, num_of_units):
-            clock_offset, clock_skew = self.process_secondary_measurement(i, msg)
+            # Compute clock offset and skew of listener
+            clock_offset, clock_skew = self.process_listener_measurement(i, msg, unit_distance)
 
-            # timediff_primary_slave_primary = (msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0]) \
-            #                     / (1)
-            # timediff_slave_primary_tmp = timediff_primary_slave_primary - adjusted_processing_time_slave_2
-            # timediff_slave_primary = timediff_slave_primary_tmp - timediff_one_way
-            # #timediff_slave_primary = timediff_primary_slave_primary - timediff_one_way - adjusted_processing_time_slave
-            # tof_primary = self.convert_dw_timeunits_to_microseconds(timediff_slave_primary)
-            # range_primary = self.convert_time_of_flight_to_distance(tof_primary)
+            # Compute timediff from master -> slave -> listener
+            rtt_master_slave_listener = \
+                (msg.timestamp_slave_reply[i] - clock_offset - msg.timestamp_master_request_1[i]) \
+                * (1 + clock_skew) + unit_distance[i] / self.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT
 
-            timediff_primary_slave_secondary = (msg.timestamp_slave_reply[i] - clock_offset - msg.timestamp_master_request_1[0]) \
-                                * (1 + clock_skew)
-            #
-            timediff_slave_secondary = timediff_primary_slave_secondary - timediff_one_way - adjusted_processing_time_slave_2
-            tof_secondary = self.convert_dw_timeunits_to_microseconds(timediff_slave_secondary)
-            range_secondary = self.convert_time_of_flight_to_distance(tof_secondary)
+            # Compute TOF from slave -> listener
+            tof_slave_listener = rtt_master_slave_listener - tof_master_slave - adjusted_processing_time_slave
+            # Convert to microseconds and compute corresponding range
+            tof_slave_listener_us = self.convert_dw_timeunits_to_microseconds(tof_slave_listener)
+            range_slave_listener = self.convert_time_of_flight_to_distance(tof_slave_listener_us)
 
-            tofs.append(tof_secondary)
-            ranges.append(range_secondary)
+            tofs.append(tof_slave_listener_us)
+            ranges.append(range_slave_listener)
             clock_offsets.append(clock_offset)
             clock_skews.append(clock_skew)
 
+        # Compute slave clock offset and skew for plotting
+        slave_clock_offset, slave_clock_skew = self.process_slave_measurement(tof_master_slave, msg)
+
         return tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew
 
-    def process_slave_measurement(self, range, uwb_multi_range_raw_msg):
+    def process_slave_measurement(self, tof_master_slave, uwb_multi_range_raw_msg):
         msg = uwb_multi_range_raw_msg
 
         # clock offset
         timestamp_master = msg.timestamp_master_request_1[0]
         timestamp_slave = msg.timestamp_master_request_1_recv
         clock_offset = timestamp_slave - timestamp_master \
-            - range / self.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT
+            - tof_master_slave
 
         # clock skew
         clock_diff_1 = float(msg.timestamp_master_request_2[0] - msg.timestamp_master_request_1[0])
@@ -185,14 +220,14 @@ class UWBMultiRange(object):
 
         return clock_offset, clock_skew
 
-    def process_secondary_measurement(self, index, uwb_multi_range_raw_msg):
+    def process_listener_measurement(self, index, uwb_multi_range_raw_msg, unit_distance):
         msg = uwb_multi_range_raw_msg
 
         # clock offset
-        timestamp_primary = msg.timestamp_master_request_1[0]
-        timestamp_secondary = msg.timestamp_master_request_1[index]
-        clock_offset = timestamp_secondary - timestamp_primary \
-            - self.unit_distance[index] / self.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT
+        timestamp_master = msg.timestamp_master_request_1[0]
+        timestamp_listener = msg.timestamp_master_request_1[index]
+        clock_offset = timestamp_listener - timestamp_master \
+            - unit_distance[index] / self.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT
 
         # clock skew
         clock_diff_1 = float(msg.timestamp_master_request_2[0] - msg.timestamp_master_request_1[0])
@@ -202,6 +237,9 @@ class UWBMultiRange(object):
         return clock_offset, clock_skew
 
     def update_visualization(self, tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew):
+        if not self.show_plots:
+            return
+
         num_of_units = len(tofs)
 
         # ranges
@@ -239,85 +277,31 @@ class UWBMultiRange(object):
         self.clock_skew_plot.add_point(len(self.clock_skew_plot) - 1, slave_clock_skew)
 
     def exec_(self):
-        import sys
-        if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION'):
-            pyqtgraph.QtGui.QApplication.exec_()
-
-    def run(self):
-        while not rospy.is_shutdown():
-            self.step(False)
-
-    def step(self, check_rospy = True):
-        if check_rospy:
-            if rospy.is_shutdown():
-                return False
-        try:
-            msg = self.mav.try_receive_message()
-            if msg is not None:
-                if msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_TRACKER_RAW_4:
-                    #print("UWB multi range: {}".format(msg))
-
-                    ros_msg = uwb.msg.UWBMultiRangeRaw()
-                    ros_msg.header.stamp = rospy.Time.now()
-                    ros_msg.num_of_units = msg.num_of_units
-                    ros_msg.address = msg.address
-                    ros_msg.remote_address = msg.remote_address
-                    ros_msg.timestamp_master_request_1_recv = msg.timestamp_master_request_1_recv
-                    ros_msg.timestamp_slave_reply_send = msg.timestamp_slave_reply_send
-                    ros_msg.timestamp_master_request_2_recv = msg.timestamp_master_request_2_recv
-                    ros_msg.timestamp_master_request_1 = msg.timestamp_master_request_1
-                    ros_msg.timestamp_slave_reply = msg.timestamp_slave_reply
-                    ros_msg.timestamp_master_request_2 = msg.timestamp_master_request_2
-                    self.uwb_raw_pub.publish(ros_msg)
-
-                    tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew \
-                        = self.process_raw_measurements(msg)
-
-                    ros_msg = uwb.msg.UWBMultiRange()
-                    ros_msg.header.stamp = rospy.Time.now()
-                    ros_msg.num_of_units = msg.num_of_units
-                    ros_msg.address = msg.address
-                    ros_msg.remote_address = msg.remote_address
-                    ros_msg.tofs = tofs
-                    ros_msg.ranges = ranges
-                    self.uwb_pub.publish(ros_msg)
-
-                    self.update_visualization(tofs, ranges, clock_offsets, clock_skews,
-                                              slave_clock_offset, slave_clock_skew)
-
-                    self.msg_count += 1
-
-            now = rospy.get_time()
-            if now - self.last_now >= self.INFO_PRINT_RATE:
-                msg_rate = self.msg_count / (now - self.last_now)
-                print("Receiving MAVLink messages with rate {} Hz".format(msg_rate))
-                self.last_now = now
-                self.msg_count = 0
-        except mavlink_bridge.uwb.MAVError, e:
-            if self.mav_error_handler is not None:
-                self.mav_error_handler(e)
-            else:
-                sys.stderr.write("MAVError: {}\n".format(e))
-        return True
+        if self.show_plots:
+            import sys
+            if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION'):
+                pyqtgraph.QtGui.QApplication.exec_()
+        else:
+            rospy.spin()
 
 
 def main():
     rospy.init_node('uwb_multi_range_node')
 
-    serial_port = rospy.get_param('~serial_port', '/dev/ttyACM0')
-    baud_rate = int(rospy.get_param('~baud_rate', "115200"))
-    uwb_topic = rospy.get_param('~uwb_topic', '/uwb/multi_range')
-    print("Reading from serial port {} with baud-rate {}".format(serial_port, baud_rate))
-    print("Publishing to {}".format(uwb_topic))
+    show_plots = rospy.get_param('~show_plots', True)
+    uwb_timestamps_topic = rospy.get_param('~timestamps_topic', '/uwb/timestamps')
+    uwb_multi_range_topic = rospy.get_param('~multi_range_topic', '/uwb/multi_range')
+    uwb_multi_range_raw_topic = rospy.get_param('~multi_range_raw_topic', '/uwb/multi_range_raw')
+    print("Receiving timestamps messages from: {}".format(uwb_timestamps_topic))
+    print("Publishing multi-range messages to {}".format(uwb_multi_range_topic))
+    print("Publishing raw multi-range messages to {}".format(uwb_multi_range_raw_topic))
 
-    ur = UWBMultiRange(serial_port, baud_rate, uwb_topic)
+    u = UWBMultiRange(uwb_multi_range_topic, uwb_multi_range_raw_topic, uwb_timestamps_topic, show_plots)
     try:
-        # ur.run()
-        ur.exec_()
+        u.exec_()
     except (rospy.ROSInterruptException, select.error):
         print("Interrupted... Stopping.")
 
 
 if __name__ == '__main__':
     main()
-
