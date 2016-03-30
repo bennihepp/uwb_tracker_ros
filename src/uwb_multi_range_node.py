@@ -126,16 +126,11 @@ class UWBMultiRange(object):
             self._unit_coefficients[i, :] = [p0, p1]
         rospy.loginfo("Unit offsets: {}".format(self._unit_offsets))
         rospy.loginfo("Unit coefficients: {}".format(self._unit_coefficients))
-        self._unit_distances = np.zeros((num_of_units, ))
-        for i in xrange(num_of_units):
-            dist = np.linalg.norm(self._unit_offsets[i, :] - self._unit_offsets[0, :])
-            self._unit_distances[i] = dist
-        rospy.loginfo("Unit distances: {}".format(self._unit_distances))
 
     def handle_timestamps_message(self, multi_range_raw_msg):
         # Compute time-of-flight and ranges from timestamps measurements
         tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew \
-            = self.process_timestamps_measurements(multi_range_raw_msg, self._unit_distances, self._unit_coefficients)
+            = self.process_timestamps_measurements(multi_range_raw_msg, self._unit_coefficients)
 
         # Publish multi-range message
         if self.uwb_pub.get_num_connections() > 0:
@@ -201,13 +196,11 @@ class UWBMultiRange(object):
     def convert_time_of_flight_to_distance(self, tof):
         return self.SPEED_OF_LIGHT_IN_M_PER_US * tof
 
-    def process_timestamps_measurements(self, uwb_multi_range_raw_msg, unit_distances=None, unit_coefficients=None):
+    def process_timestamps_measurements(self, uwb_multi_range_raw_msg, unit_coefficients=None):
         msg = uwb_multi_range_raw_msg
         num_of_units = msg.num_of_units
 
         # Set default distances and coefficients if not specified
-        if unit_distances is None:
-            unit_distances = np.zeros((num_of_units,))
         if unit_coefficients is None:
             unit_coefficients = np.zeros((num_of_units, 2))
             for i in xrange(num_of_units):
@@ -238,12 +231,12 @@ class UWBMultiRange(object):
 
         for i in xrange(1, num_of_units):
             # Compute clock offset and skew of listener
-            clock_offset, clock_skew = self.process_listener_measurement(i, msg, unit_distances[i])
+            clock_offset, clock_skew = self.process_listener_measurement(i, msg)
 
             # Compute timediff from master -> slave -> listener
             rtt_master_slave_listener = \
                 (msg.timestamp_slave_reply[i] - msg.timestamp_master_request_1[i]) \
-                * (1 + clock_skew) + unit_distances[i] / self.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT
+                * (1 + clock_skew)
 
             # Compute TOF from slave -> listener
             tof_slave_listener = rtt_master_slave_listener - tof_master_slave - adjusted_processing_time_slave
@@ -278,14 +271,13 @@ class UWBMultiRange(object):
 
         return clock_offset, clock_skew
 
-    def process_listener_measurement(self, index, uwb_multi_range_raw_msg, unit_distance):
+    def process_listener_measurement(self, index, uwb_multi_range_raw_msg):
         msg = uwb_multi_range_raw_msg
 
         # clock offset
         timestamp_master = msg.timestamp_master_request_1[0]
         timestamp_listener = msg.timestamp_master_request_1[index]
-        clock_offset = timestamp_listener - timestamp_master \
-            - unit_distance / self.SPEED_OF_LIGHT_IN_M_PER_DW_TIMEUNIT
+        clock_offset = timestamp_listener - timestamp_master
 
         # clock skew
         clock_diff_1 = float(msg.timestamp_master_request_2[0] - msg.timestamp_master_request_1[0])
