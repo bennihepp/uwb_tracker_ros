@@ -138,10 +138,10 @@ class UWBMultiRange(object):
         clock_skews.append(0.0)
 
         slave_clock_offset, slave_clock_skew = self.process_slave_measurement(range, msg)
-        adjusted_processing_time_slave = float(msg.timestamp_slave_reply_send - msg.timestamp_master_request_1_recv) \
-                                         / (1 + slave_clock_skew)
-        adjusted_processing_time_slave_us = self.convert_dw_timeunits_to_microseconds(adjusted_processing_time_slave)
-        adjusted_processing_time_slave_2 = (msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0]) \
+        #adjusted_processing_time_slave = float(msg.timestamp_slave_reply_send - msg.timestamp_master_request_1_recv) \
+        #                                 / (1 + slave_clock_skew)
+        #adjusted_processing_time_slave_us = self.convert_dw_timeunits_to_microseconds(adjusted_processing_time_slave)
+        adjusted_processing_time_slave = (msg.timestamp_slave_reply[0] - msg.timestamp_master_request_1[0]) \
                                            - 2 * timediff_one_way
 
         for i in xrange(1, num_of_units):
@@ -158,7 +158,7 @@ class UWBMultiRange(object):
             timediff_primary_slave_secondary = (msg.timestamp_slave_reply[i] - clock_offset - msg.timestamp_master_request_1[0]) \
                                 * (1 + clock_skew)
             #
-            timediff_slave_secondary = timediff_primary_slave_secondary - timediff_one_way - adjusted_processing_time_slave_2
+            timediff_slave_secondary = timediff_primary_slave_secondary - timediff_one_way - adjusted_processing_time_slave
             tof_secondary = self.convert_dw_timeunits_to_microseconds(timediff_slave_secondary)
             range_secondary = self.convert_time_of_flight_to_distance(tof_secondary)
 
@@ -257,30 +257,32 @@ class UWBMultiRange(object):
                 if msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_TRACKER_RAW_4:
                     #print("UWB multi range: {}".format(msg))
 
-                    ros_msg = uwb.msg.UWBMultiRangeRaw()
-                    ros_msg.header.stamp = rospy.Time.now()
-                    ros_msg.num_of_units = msg.num_of_units
-                    ros_msg.address = msg.address
-                    ros_msg.remote_address = msg.remote_address
-                    ros_msg.timestamp_master_request_1_recv = msg.timestamp_master_request_1_recv
-                    ros_msg.timestamp_slave_reply_send = msg.timestamp_slave_reply_send
-                    ros_msg.timestamp_master_request_2_recv = msg.timestamp_master_request_2_recv
-                    ros_msg.timestamp_master_request_1 = msg.timestamp_master_request_1
-                    ros_msg.timestamp_slave_reply = msg.timestamp_slave_reply
-                    ros_msg.timestamp_master_request_2 = msg.timestamp_master_request_2
-                    self.uwb_raw_pub.publish(ros_msg)
+                    if self.uwb_raw_pub.getNumSubscribers():
+                        ros_msg = uwb.msg.UWBMultiRangeRaw()
+                        ros_msg.header.stamp = rospy.Time.now()
+                        ros_msg.num_of_units = msg.num_of_units
+                        ros_msg.address = msg.address
+                        ros_msg.remote_address = msg.remote_address
+                        ros_msg.timestamp_master_request_1_recv = msg.timestamp_master_request_1_recv
+                        ros_msg.timestamp_slave_reply_send = msg.timestamp_slave_reply_send
+                        ros_msg.timestamp_master_request_2_recv = msg.timestamp_master_request_2_recv
+                        ros_msg.timestamp_master_request_1 = msg.timestamp_master_request_1
+                        ros_msg.timestamp_slave_reply = msg.timestamp_slave_reply
+                        ros_msg.timestamp_master_request_2 = msg.timestamp_master_request_2
+                        self.uwb_raw_pub.publish(ros_msg)
 
-                    tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew \
-                        = self.process_raw_measurements(msg)
+                    if self.uwb_pub.getNumSubscribers():
+                        tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew \
+                            = self.process_raw_measurements(msg)
 
-                    ros_msg = uwb.msg.UWBMultiRange()
-                    ros_msg.header.stamp = rospy.Time.now()
-                    ros_msg.num_of_units = msg.num_of_units
-                    ros_msg.address = msg.address
-                    ros_msg.remote_address = msg.remote_address
-                    ros_msg.tofs = tofs
-                    ros_msg.ranges = ranges
-                    self.uwb_pub.publish(ros_msg)
+                        ros_msg = uwb.msg.UWBMultiRange()
+                        ros_msg.header.stamp = rospy.Time.now()
+                        ros_msg.num_of_units = msg.num_of_units
+                        ros_msg.address = msg.address
+                        ros_msg.remote_address = msg.remote_address
+                        ros_msg.tofs = tofs
+                        ros_msg.ranges = ranges
+                        self.uwb_pub.publish(ros_msg)
 
                     self.update_visualization(tofs, ranges, clock_offsets, clock_skews,
                                               slave_clock_offset, slave_clock_skew)
