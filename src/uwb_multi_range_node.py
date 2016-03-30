@@ -13,8 +13,6 @@ import serial
 import roslib
 roslib.load_manifest('uwb')
 import rospy
-import pyqtgraph
-from pyqtgraph.Qt import QtGui, QtCore
 
 import uwb.msg
 
@@ -54,18 +52,6 @@ class DataPlot(object):
         return len(self.curves)
 
 
-class MainWindow(pyqtgraph.GraphicsWindow):
-
-    def __init__(self, *args, **kwargs):
-        super(MainWindow, self).__init__(*args, **kwargs)
-
-    def showEvent(self, event):
-        super(MainWindow, self).showEvent(event)
-
-    def closeEvent(self, event):
-        super(MainWindow, self).closeEvent(event)
-
-
 class UWBMultiRange(object):
 
     INFO_PRINT_RATE = 2
@@ -99,6 +85,20 @@ class UWBMultiRange(object):
         self.last_now = rospy.get_time()
 
     def _setup_plots(self):
+        import pyqtgraph
+        from pyqtgraph.Qt import QtGui, QtCore
+
+        class MainWindow(pyqtgraph.GraphicsWindow):
+
+            def __init__(self, *args, **kwargs):
+                super(MainWindow, self).__init__(*args, **kwargs)
+
+            def showEvent(self, event):
+                super(MainWindow, self).showEvent(event)
+
+            def closeEvent(self, event):
+                super(MainWindow, self).closeEvent(event)
+
         self.window = MainWindow()
         self.range_plot = DataPlot(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
         self.range_plot.get_plot().addLegend()
