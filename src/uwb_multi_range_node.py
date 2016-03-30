@@ -114,22 +114,24 @@ class UWBMultiRange(object):
             = self.process_timestamps_measurements(multi_range_raw_msg, self.unit_distance)
 
         # Publish multi-range message
-        ros_msg = uwb.msg.UWBMultiRange()
-        ros_msg.header.stamp = rospy.Time.now()
-        ros_msg.num_of_units = msg.num_of_units
-        ros_msg.address = msg.address
-        ros_msg.remote_address = msg.remote_address
-        ros_msg.tofs = tofs
-        ros_msg.ranges = ranges
-        self.uwb_pub.publish(ros_msg)
+        if self.uwb_pub.getNumOfSubscribers():
+            ros_msg = uwb.msg.UWBMultiRange()
+            ros_msg.header.stamp = rospy.Time.now()
+            ros_msg.num_of_units = multi_range_raw_msg.num_of_units
+            ros_msg.address = multi_range_raw_msg.address
+            ros_msg.remote_address = multi_range_raw_msg.remote_address
+            ros_msg.tofs = tofs
+            ros_msg.ranges = ranges
+            self.uwb_pub.publish(ros_msg)
 
-        # Compute raw (without rigid configuration model) time-of-flight and ranges from timestamps measurements
-        raw_tofs, raw_ranges, _, _, _, _ \
-            = self.process_timestamps_measurements(multi_range_raw_msg, [0.0] * msg.num_of_units)
+        if self.uwb_raw_pub.getNumOfSubscribers():
+            # Compute raw (without rigid configuration model) time-of-flight and ranges from timestamps measurements
+            raw_tofs, raw_ranges, _, _, _, _ \
+                = self.process_timestamps_measurements(multi_range_raw_msg, [0.0] * multi_range_raw_msg.num_of_units)
 
-        ros_msg.tofs = raw_tofs
-        ros_msg.ranges = raw_ranges
-        self.uwb_raw_pub.publish(ros_msg)
+            ros_msg.tofs = raw_tofs
+            ros_msg.ranges = raw_ranges
+            self.uwb_raw_pub.publish(ros_msg)
 
         # Optionally: Update plots
         if self.show_plots:
