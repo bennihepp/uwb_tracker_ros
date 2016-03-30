@@ -54,7 +54,9 @@ add_message_files(
   FILES
   UWBRange.msg
   UWBRangeStats.msg
+  UWBRangeWithOffset.msg
   UWBMultiRange.msg
+  UWBMultiRangeWithOffsets.msg
   UWBMultiRangeRaw.msg
   UWBMultiRangeTimestamps.msg
 )
@@ -67,6 +69,7 @@ add_message_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  geometry_msgs
 )
 
 ###################################
