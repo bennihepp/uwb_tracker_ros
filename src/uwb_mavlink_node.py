@@ -59,21 +59,21 @@ class UWBMavlink(object):
                     ros_msg.timestamp_master_request_2 = msg.timestamp_master_request_2
                     self.uwb_pub.publish(ros_msg)
                 elif msg.get_msgId() == mavlink_bridge.uwb.MAVLINK_MSG_ID_UWB_STATUS:
-                    print("STATUS: {}".format(msg.description))
+                    rospy.logwarn("STATUS: {}".format(msg.description))
 
                 self.msg_count += 1
 
             now = rospy.get_time()
             if now - self.last_now >= self.INFO_PRINT_RATE:
                 msg_rate = self.msg_count / (now - self.last_now)
-                print("Receiving MAVLink messages with rate {} Hz".format(msg_rate))
+                rospy.loginfo("Receiving MAVLink messages with rate {} Hz".format(msg_rate))
                 self.last_now = now
                 self.msg_count = 0
         except mavlink_bridge.uwb.MAVError, e:
             if self.mav_error_handler is not None:
                 self.mav_error_handler(e)
             else:
-                sys.stderr.write("MAVError: {}\n".format(e))
+                rospy.logerr("MAVError: {}\n".format(e))
         return True
 
 
@@ -83,16 +83,16 @@ def main():
     serial_port = rospy.get_param('~serial_port', '/dev/ttyACM0')
     baud_rate = int(rospy.get_param('~baud_rate', "115200"))
     topic = rospy.get_param('~topic', '/uwb/timestamps')
-    print("Reading from serial port {} with baud-rate {}".format(serial_port, baud_rate))
-    print("Publishing to {}".format(topic))
+    rospy.loginfo("Reading from serial port {} with baud-rate {}".format(serial_port, baud_rate))
+    rospy.loginfo("Publishing to {}".format(topic))
 
     try:
         um = UWBMavlink(serial_port, baud_rate, topic)
         um.run()
     except (rospy.ROSInterruptException, select.error):
-        print("Interrupted... Stopping.")
+        rospy.logwarn("Interrupted... Stopping.")
     except serial.serialutil.SerialException, e:
-        print("Problem with serial port: {}".format(e))
+        rospy.logerr("Problem with serial port: {}".format(e))
 
 
 if __name__ == '__main__':

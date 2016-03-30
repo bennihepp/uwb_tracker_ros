@@ -1,0 +1,9 @@
+<launch>
+  <arg name="no_mavlink" default="false" />
+  <arg name="show_plots" default="false" />
+  <include file="$(find uwb)/launch/uwb_mavlink.launch" unless="$(arg no_mavlink)" />
+  <node name="uwb_multi_range_node" pkg="uwb" type="uwb_multi_range_node.py" output="screen">
+    <rosparam command="load" file="$(find uwb)/config/params_pyramid.yaml" />
+    <param name="show_plots" value="$(arg show_plots)" />
+  </node>
+</launch>
