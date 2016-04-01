@@ -1,4 +1,3 @@
-# Deprecated
 Header header
 uint8 num_of_units
 uint8 address

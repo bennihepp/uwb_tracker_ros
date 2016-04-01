@@ -1,0 +1,12 @@
+<launch>
+  <arg name="no_mavlink" default="false" />
+  <arg name="show_plots" default="false" />
+  <arg name="load_params" default="true" />
+  <arg name="params_name" default="params.yaml" />
+  <arg name="params_file" default="$(find uwb)/config/$(arg params_name)" />
+  <include file="$(find uwb)/launch/uwb_mavlink.launch" unless="$(arg no_mavlink)" />
+  <node name="uwb_multi_range_node" pkg="uwb" type="uwb_multi_range_node.py" output="screen">
+    <rosparam command="load" file="$(arg params_file)" if="$(arg load_params)" />
+    <param name="show_plots" value="$(arg show_plots)" />
+  </node>
+</launch>

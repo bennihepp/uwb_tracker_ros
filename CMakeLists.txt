@@ -58,6 +58,7 @@ add_message_files(
   UWBMultiRange.msg
   UWBMultiRangeWithOffsets.msg
   UWBMultiRangeRaw.msg
+  UWBMultiRangeTimestamps.msg
 )
 
 #add_service_files(
