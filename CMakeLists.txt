@@ -105,18 +105,25 @@ include_directories(
   src/codegen
   ${catkin_INCLUDE_DIRS}
 )
+include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+rosbuild_add_boost_directories()
 
 
 ## Declare a C++ executable
 add_executable(uwb_tracker_node src/nodes/uwb_tracker_node.cpp src/UWBTracker.cpp ${matlab_sources_uwb_tracker})
+add_executable(uwb_serial_node src/nodes/uwb_serial_node.cpp src/UWBSerial.cpp include/UWBSerial.h src/Serial.cpp include/Serial.h src/ait_link/ait_link.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 add_dependencies(uwb_tracker_node ${PROJECT_NAME}_generate_messages_cpp)
+add_dependencies(uwb_serial_node ${PROJECT_NAME}_generate_messages_cpp)
 
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(uwb_tracker_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(uwb_serial_node
   ${catkin_LIBRARIES}
 )
 
