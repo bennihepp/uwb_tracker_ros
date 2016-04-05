@@ -186,7 +186,7 @@ class UWBMultiRange(object):
         now = rospy.get_time()
         if now - self.last_now >= self.INFO_PRINT_RATE:
             msg_rate = self.msg_count / (now - self.last_now)
-            rospy.loginfo("Receiving MAVLink messages with rate {} Hz".format(msg_rate))
+            rospy.loginfo("Receiving UWB timestamps with rate {} Hz".format(msg_rate))
             self.last_now = now
             self.msg_count = 0
 

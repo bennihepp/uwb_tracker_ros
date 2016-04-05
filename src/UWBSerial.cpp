@@ -74,7 +74,7 @@ void UWBSerial::printInfoCallback(const ros::TimerEvent& ev) {
   ros::Duration elapsed_duration = now_time - last_info_time_;
   if (elapsed_duration >= print_info_period_) {
     double msg_rate = msg_counter_ / elapsed_duration.toSec();
-    ROS_INFO_STREAM("Receiving MAVLink messages with rate " << msg_rate << " Hz");
+    ROS_INFO_STREAM("Receiving UWBLink multi-range messages with rate " << msg_rate << " Hz");
     msg_counter_ = 0;
     last_info_time_ = now_time;
   }
