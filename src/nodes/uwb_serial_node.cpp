@@ -20,7 +20,7 @@ int main(int argc, char **argv)
   try {
     UWBSerial uwb_serial;
     ros::spin();
-  } catch (const std::runtime_error& exc) {
+  } catch (const std::exception& exc) {
     ROS_ERROR_STREAM("Error occured: " << exc.what());
   }
 
