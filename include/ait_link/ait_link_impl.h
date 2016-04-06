@@ -1,3 +1,10 @@
+//
+// HDLC based serial communication class.
+//
+// Created by Benjamin Hepp on 02.04.16.
+// Copyright (c) 2016 Benjamin Hepp. All rights reserved.
+//
+
 #pragma once
 
 #include "ait_link.h"
