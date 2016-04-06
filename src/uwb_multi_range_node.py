@@ -17,7 +17,7 @@ import rospy
 import uwb.msg
 
 
-class DataPlot(object):
+class PlotData(object):
 
     def __init__(self, plot, max_data_length=None):
         self.plot = plot
@@ -85,28 +85,15 @@ class UWBMultiRange(object):
         self.last_now = rospy.get_time()
 
     def _setup_plots(self):
-        import pyqtgraph
-        from pyqtgraph.Qt import QtGui, QtCore
-
-        class MainWindow(pyqtgraph.GraphicsWindow):
-
-            def __init__(self, *args, **kwargs):
-                super(MainWindow, self).__init__(*args, **kwargs)
-
-            def showEvent(self, event):
-                super(MainWindow, self).showEvent(event)
-
-            def closeEvent(self, event):
-                super(MainWindow, self).closeEvent(event)
-
+        from gui_utils import MainWindow
         self.window = MainWindow()
-        self.range_plot = DataPlot(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
+        self.range_plot = PlotData(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
         self.range_plot.get_plot().addLegend()
         self.window.nextRow()
-        self.clock_offset_plot = DataPlot(self.window.addPlot(title="Clock offset"), self.VISUALIZATION_DATA_LENGTH)
+        self.clock_offset_plot = PlotData(self.window.addPlot(title="Clock offset"), self.VISUALIZATION_DATA_LENGTH)
         self.clock_offset_plot.get_plot().addLegend()
         self.window.nextRow()
-        self.clock_skew_plot = DataPlot(self.window.addPlot(title="Clock skew"), self.VISUALIZATION_DATA_LENGTH)
+        self.clock_skew_plot = PlotData(self.window.addPlot(title="Clock skew"), self.VISUALIZATION_DATA_LENGTH)
         self.clock_skew_plot.get_plot().addLegend()
 
     def _read_unit_offsets(self):
@@ -290,6 +277,7 @@ class UWBMultiRange(object):
         if not self.show_plots:
             return
 
+        import pyqtgraph
         num_of_units = len(tofs)
 
         # ranges
@@ -329,6 +317,7 @@ class UWBMultiRange(object):
     def exec_(self):
         if self.show_plots:
             import sys
+            import pyqtgraph
             if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION'):
                 pyqtgraph.QtGui.QApplication.exec_()
         else:

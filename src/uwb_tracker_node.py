@@ -17,10 +17,9 @@ import pyqtgraph
 from pyqtgraph.Qt import QtGui, QtCore
 
 import uwb.msg
-from uwb_multi_range_node import MainWindow
 
 
-class DataPlot(object):
+class PlotData(object):
 
     def __init__(self, plot, max_data_length=None):
         self.plot = plot
@@ -66,40 +65,66 @@ class UWBTracker(object):
                                             self.handle_multi_range_message)
 
         # TODO: Read parameters and initial state
-        self.state = 0
+        self.states = {}
 
         self.show_plots = show_plots
         if show_plots:
             self._setup_plots()
 
     def _setup_plots(self):
-        self.window = MainWindow(timer)
+        from gui_utils import MainWindow
+        self.window = MainWindow()
+        self.range_plot = PlotData(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
+        self.range_plot.get_plot().addLegend()
+        self.window.nextRow()
+        self.clock_offset_plot = PlotData(self.window.addPlot(title="Clock offset"), self.VISUALIZATION_DATA_LENGTH)
+        self.clock_offset_plot.get_plot().addLegend()
+        self.window.nextRow()
+        self.clock_skew_plot = PlotData(self.window.addPlot(title="Clock skew"), self.VISUALIZATION_DATA_LENGTH)
+        self.clock_skew_plot.get_plot().addLegend()
 
     def handle_multi_range_message(self, multi_range_msg):
         # Update tracker position based on time-of-flight measurements
-        self.state = self.update_state(multi_range_msg)
+        new_state = self.update_state(multi_range_msg)
 
         # Publish tracker message
         ros_msg = uwb.msg.UWBTracker()
         ros_msg.header.stamp = rospy.Time.now()
-        ros_msg.address = msg.address
-        ros_msg.remote_address = msg.remote_address
-        ros_msg.state = state
+        ros_msg.address = multi_range_msg.address
+        ros_msg.remote_address = multi_range_msg.remote_address
+        ros_msg.state = new_state
         self.uwb_pub.publish(ros_msg)
 
         # Optionally: Update plots
         if self.show_plots:
             self.update_visualization()
 
+    def initialize_state(self, state_id):
+        # TODO: Set initial state estimate
+        self.states[state_id] = 0
+
+    def update_state(self, multi_range_msg):
+        state_id = (multi_range_msg.address, multi_range_msg.remote_address)
+        if state_id not in self.states:
+            self.initialize_state(state_id)
+
+        # TODO: Update state
+        state = self.states[state_id]
+        new_state = state
+        self.states[state_id] = new_state
+        return new_state
+
     def update_visualization(self, tofs, ranges, clock_offsets, clock_skews, slave_clock_offset, slave_clock_skew):
         if not self.show_plots:
             return
 
+        import pyqtgraph
         pass
 
     def exec_(self):
         if self.show_plots:
             import sys
+            import pyqtgraph
             if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION'):
                 pyqtgraph.QtGui.QApplication.exec_()
         else:

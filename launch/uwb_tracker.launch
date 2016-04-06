@@ -1,7 +1,3 @@
 <launch>
-  <arg name="no_mavlink" default="false" />
-  <include file="$(find uwb)/launch/uwb_mavlink.launch" unless="$(arg no_mavlink)" />
-  <node name="uwb_tracker" pkg="uwb" type="uwb_tracker_node" output="screen">
-    <rosparam command="load" file="$(find uwb)/config/params_dummy.yaml" />
-  </node>
+  <node name="uwb_tracker_node" pkg="uwb" type="uwb_tracker_node.py" output="screen" />
 </launch>
