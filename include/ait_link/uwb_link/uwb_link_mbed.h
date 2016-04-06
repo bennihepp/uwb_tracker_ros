@@ -3,9 +3,9 @@
 #include <ait_link/ait_link_mbed.h>
 #include "uwb_link.h"
 
+#ifdef __MBED__
 namespace ait {
 
-#ifdef __MBED__
   class UWBLinkMbed : public UWBLink {
     AITLinkMbed ait_link_;
 
@@ -14,6 +14,7 @@ public:
         : UWBLink(&ait_link_, buffer_size), ait_link_(serial) {
     }
 };
-#endif // __MBED__
 
 }
+
+#endif // __MBED__

@@ -4,9 +4,10 @@
 
 #include "ait_link.h"
 
+#ifdef __MBED__
+
 namespace ait {
 
-#ifdef __MBED__
   class AITLinkMbed : public AITLink {
     BufferedSerial* _serial;
 
@@ -25,6 +26,7 @@ public:
         _serial->putc(data);
     }
 };
-#endif // __MBED__
 
 }
+
+#endif // __MBED__

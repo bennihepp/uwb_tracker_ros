@@ -7,37 +7,14 @@
 
 namespace ait {
 
-  struct UWBMessagePart {
+  class UWBMessageBody {
+  public:
     virtual int getSize() const = 0;
     virtual void buildMessage(uint8_t* buffer) const = 0;
     virtual bool decodeMessage(const uint8_t* buffer, size_t buffer_size) = 0;
   };
 
-  struct UWBMessageHeader : public UWBMessagePart {
-    UWBMessageHeader(uint8_t type)
-            : type(type) {
-    }
-
-    virtual int getSize() const {
-      return sizeof(type);
-    }
-    virtual void buildMessage(uint8_t* buffer) const {
-      buffer[0] = type;
-    }
-
-    virtual bool decodeMessage(const uint8_t* buffer, size_t buffer_size) {
-      if (buffer_size >= getSize()) {
-        type = buffer[0];
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    uint8_t type;
-  };
-
-  class UWBMessageString : public UWBMessagePart {
+  class UWBMessageString : public UWBMessageBody {
   public:
     UWBMessageString()
             : str_length_(-1), str_(NULL) {
@@ -83,7 +60,7 @@ namespace ait {
     const char* str_;
   };
 
-  struct UWBMessageMultiRange : public UWBMessagePart {
+  struct UWBMessageMultiRange : public UWBMessageBody {
     UWBMessageMultiRange()
             : address(0), remote_address(0) {
     }
@@ -201,65 +178,67 @@ namespace ait {
     const static uint8_t UWB_MESSAGE_TYPE_MULTI_RANGE = 0x02;
 
     UWBMessage()
-            : msg_header_(0), parts_allocated_(false) {
+            : type_(UWB_MESSAGE_TYPE_NOP), body_(NULL), part_allocated_(false) {
     }
 
     UWBMessage(uint8_t type)
-            : msg_header_(type), parts_allocated_(false) {
-      parts_.push_back(&msg_header_);
+            : type_(type), body_(NULL), part_allocated_(false) {
     }
 
-    UWBMessage(uint8_t type, const UWBMessagePart* part)
-            : msg_header_(type), parts_allocated_(false) {
-      parts_.push_back(&msg_header_);
-      parts_.push_back(part);
+    UWBMessage(uint8_t type, const UWBMessageBody* body)
+            : type_(type), body_(body), part_allocated_(false) {
     }
 
     ~UWBMessage() {
-      deleteParts();
+      clearMessageBody();
     }
 
-    const std::vector<const UWBMessagePart*>& getParts() const {
-      return parts_;
+    uint8_t getType() const {
+      return type_;
     }
 
-    void addMessagePart(const UWBMessagePart* part) {
-      parts_.push_back(part);
+    const UWBMessageBody* getMessageBody() const {
+      return body_;
+    }
+
+    void setMessageBody(const UWBMessageBody* body) {
+      clearMessageBody();
+      body_ = body;
     }
 
     int getSize() const {
-      int size = 0;
-      for (int i = 0; i < parts_.size(); ++i) {
-        size += parts_[i]->getSize();
+      int size = sizeof(type_);
+      if (body_ != NULL) {
+        size += body_->getSize();
       }
       return size;
     }
 
     void buildMessage(uint8_t* buffer) const {
-      for (int i = 0; i < parts_.size(); ++i) {
-        parts_[i]->buildMessage(buffer);
-        int size = parts_[i]->getSize();
-        buffer += size;
+      buffer[0] = type_;
+      if (body_ != NULL) {
+        buffer += sizeof(type_);
+        body_->buildMessage(buffer);
       }
     }
 
     bool decodeMessage(const uint8_t* buffer, size_t buffer_size) {
-      deleteParts();
-      if (!msg_header_.decodeMessage(buffer, buffer_size)) {
+      clearMessageBody();
+      part_allocated_ = true;
+      if (buffer_size < sizeof(type_)) {
         return false;
       }
-      parts_.push_back(&msg_header_);
-      parts_allocated_ = true;
-      buffer += msg_header_.getSize();
-      buffer_size -= msg_header_.getSize();
-      switch (msg_header_.type) {
+      type_ = buffer[0];
+      buffer += sizeof(type_);
+      buffer_size -= sizeof(type_);
+      switch (type_) {
         case UWB_MESSAGE_TYPE_NOP: {
           break;
         }
         case UWB_MESSAGE_TYPE_STATUS: {
           UWBMessageString *msg_string = new UWBMessageString();
           if (msg_string->decodeMessage(buffer, buffer_size)) {
-            parts_.push_back(msg_string);
+            body_ = msg_string;
           } else {
             delete msg_string;
             return false;
@@ -269,7 +248,7 @@ namespace ait {
         case UWB_MESSAGE_TYPE_MULTI_RANGE: {
           UWBMessageMultiRange *msg_multi_range = new UWBMessageMultiRange();
           if (msg_multi_range->decodeMessage(buffer, buffer_size)) {
-            parts_.push_back(msg_multi_range);
+            body_ = msg_multi_range;
           } else {
             delete msg_multi_range;
             return false;
@@ -283,25 +262,24 @@ namespace ait {
     }
 
   private:
-    void deleteParts() {
-      if (parts_allocated_) {
-        for (int i = 1; i < parts_.size(); ++i) {
-          delete parts_[i];
-        }
+    void clearMessageBody() {
+      if (part_allocated_) {
+        delete body_;
+        part_allocated_ = false;
       }
-      parts_.clear();
+      body_ = NULL;
     }
 
-    UWBMessageHeader msg_header_;
-    std::vector<const UWBMessagePart*> parts_;
-    bool parts_allocated_;
+    uint8_t type_;
+    const UWBMessageBody* body_;
+    bool part_allocated_;
   };
 
   class UWBLink {
   public:
     UWBLink(AITLink* ait_link, int buffer_size = 1024)
-            : ait_link_(ait_link), buffer_size_(buffer_size),
-              handle_message_callback_(NULL), callback_user_data_(NULL) {
+            : handle_message_callback_(NULL), callback_user_data_(NULL),
+              ait_link_(ait_link), buffer_size_(buffer_size) {
       buffer_ = new uint8_t[buffer_size];
       ait_link_->registerFrameHandler(&UWBLink::handleFrameWrapper, this);
     }

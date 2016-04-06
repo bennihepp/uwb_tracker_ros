@@ -5,7 +5,7 @@
 // Copyright (c) 2016 Benjamin Hepp. All rights reserved.
 //
 
-#include "Serial.h"
+#include "ait_link/Serial.h"
 
 using ait::Serial;
 

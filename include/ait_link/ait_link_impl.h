@@ -2,11 +2,16 @@
 
 #include "ait_link.h"
 
+#ifdef __MBED__
+
+#include "ait_link_mbed.h"
+
+#else
+
+#include "Serial.h"
+
 namespace ait {
 
-#ifdef __MBED__
-#include "ait_link_mbed.h"
-#else
 class AITLinkImpl : public AITLink {
 public:
     AITLinkImpl(Serial* serial, uint16_t max_frame_length = 1024)
@@ -23,6 +28,7 @@ public:
 private:
   Serial* serial_;
 };
-#endif // __MBED__
 
 }
+
+#endif // __MBED__

@@ -37,18 +37,17 @@ UWBSerial::~UWBSerial() {
 }
 
 void UWBSerial::handleMessage(const UWBMessage& msg) {
-  const UWBMessageHeader* msg_header = dynamic_cast<const UWBMessageHeader*>(msg.getParts().front());
-  ROS_DEBUG("Received UWB message type: 0x%x\n", msg_header->type);
-  switch (msg_header->type) {
+  ROS_DEBUG("Received UWB message type: 0x%x\n", msg.getType());
+  switch (msg.getType()) {
     case UWBMessage::UWB_MESSAGE_TYPE_NOP:
       break;
     case UWBMessage::UWB_MESSAGE_TYPE_STATUS: {
-      const UWBMessageString *msg_str = dynamic_cast<const UWBMessageString *>(msg.getParts()[1]);
+      const UWBMessageString *msg_str = dynamic_cast<const UWBMessageString *>(msg.getMessageBody());
       ROS_WARN_STREAM("STATUS: " << msg_str->getString());
       break;
     }
     case UWBMessage::UWB_MESSAGE_TYPE_MULTI_RANGE: {
-      const UWBMessageMultiRange* msg_multi_range = dynamic_cast<const UWBMessageMultiRange*>(msg.getParts()[1]);
+      const UWBMessageMultiRange* msg_multi_range = dynamic_cast<const UWBMessageMultiRange*>(msg.getMessageBody());
       uwb::UWBMultiRangeTimestamps timestamps_msg;
       timestamps_msg.header.stamp = ros::Time::now();
       timestamps_msg.num_of_units = msg_multi_range->getNumOfModules();

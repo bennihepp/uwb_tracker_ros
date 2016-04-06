@@ -5,11 +5,14 @@
 
 #include <iostream>
 
+#ifdef __MBED__
+
+#include "uwb_link_mbed.h"
+
+#else
+
 namespace ait {
 
-  #ifdef __MBED__
-  #include "uwb_link_mbed.h"
-  #else
   // We need this extra base-class to ensure initialization of AITLinkImpl when initializing UWBLink in UWBLinkImpl
   class UWBLinkImplBase {
   public:
@@ -39,6 +42,7 @@ namespace ait {
       serial_.start();
     }
   };
-  #endif // __MBED__
 
 }
+
+#endif // __MBED__
