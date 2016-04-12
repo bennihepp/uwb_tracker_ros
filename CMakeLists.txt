@@ -52,13 +52,12 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  UWBRange.msg
-  UWBRangeStats.msg
-  UWBRangeWithOffset.msg
   UWBMultiRange.msg
   UWBMultiRangeWithOffsets.msg
-  UWBMultiRangeRaw.msg
   UWBMultiRangeTimestamps.msg
+  UWBRange.msg
+  UWBRangeWithOffset.msg
+  UWBTracker.msg
 )
 
 #add_service_files(
