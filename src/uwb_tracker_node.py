@@ -293,14 +293,14 @@ def main():
 
     rospy.init_node('uwb_tracker_node')
 
-    show_plots = rospy.get_param('~show_plots', True)
+    show_plots = rospy.get_param('~show_plots', False)
     uwb_multi_range_topic = rospy.get_param('~multi_range_raw_topic', '/uwb/multi_range_with_offsets')
     uwb_tracker_topic = rospy.get_param('~tracker_topic', '/uwb/tracker')
-    tracker_frame = rospy.get_param('~tracker_frame', 'vicon/UWB_Solo/UWB_Solo')
+    tracker_frame = rospy.get_param('~tracker_frame', 'uwb')
     target_frame = rospy.get_param('~target_frame', 'target')
     print("Receiving raw multi-range messages from: {}".format(uwb_multi_range_topic))
     print("Publishing tracker messages to {}".format(uwb_tracker_topic))
-    print("Publishing tracker transform as {} to {}".format(tracker_frame, target_frame))
+    print("Publishing tracker transform as {} -> {}".format(tracker_frame, target_frame))
 
     u = UWBTracker(uwb_multi_range_topic, uwb_tracker_topic, tracker_frame, target_frame, show_plots)
     def sigint_handler(sig, _):
