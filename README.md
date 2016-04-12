@@ -3,7 +3,7 @@
 A ROS package for tracking using _ultra-wideband_ (UWB) radios. The target needs one UWB tag and is localized by a tracker with multiple UWB radios (i.e. a robot).
 
 The package is made up of three nodes:
-- _uwb_serial_: Reads binary messages from a serial port. The corresponding UWB driver for an embedded board are provided at [](https://pages.github.com/).
+- _uwb_serial_: Reads binary messages from a serial port. The corresponding UWB driver for an embedded board are provided at [](https://developer.mbed.org/users/bhepp/code/AIT_UWB_Tracker/).
 - _uwb_multi_range_: Processes the multi-range timestamps from _uwb_serial_ and publishes calibrated and uncalibrated ranges.
 - _uwb_tracker_: Processes the calibrated ranges from _uwb_multi_range_ and tracks the target position using an Extended Kalman Filter. It publishes the state and covariance of the filter but also a corresponding transform.
 
