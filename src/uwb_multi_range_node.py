@@ -327,6 +327,8 @@ class UWBMultiRange(object):
         if self.show_plots:
             import pyqtgraph
             pyqtgraph.QtGui.QApplication.quit()
+        else:
+            rospy.signal_shutdown('User request')
 
 
 def main():

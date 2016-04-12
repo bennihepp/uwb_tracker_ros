@@ -6,7 +6,6 @@
 //
 
 
-#include <stdio.h>
 #include <ros/ros.h>
 
 #include "UWBSerial.h"
@@ -16,6 +15,8 @@ using ait::UWBSerial;
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "uwb_serial");
+  // The node-handle is required for ros-logging support
+  ros::NodeHandle nh_("~");
 
   try {
     UWBSerial uwb_serial;

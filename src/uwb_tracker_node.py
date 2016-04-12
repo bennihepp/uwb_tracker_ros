@@ -286,6 +286,8 @@ class UWBTracker(object):
         if self.show_plots:
             import pyqtgraph
             pyqtgraph.QtGui.QApplication.quit()
+        else:
+            rospy.signal_shutdown('User request')
 
 
 def main():
@@ -311,7 +313,6 @@ def main():
         u.exec_()
     except (rospy.ROSInterruptException, select.error):
         rospy.logwarn("Interrupted... Stopping.")
-    pass
 
 
 if __name__ == '__main__':

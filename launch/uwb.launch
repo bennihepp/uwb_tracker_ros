@@ -1,0 +1,36 @@
+<launch>
+
+  <arg name="show_plots" default="false" />
+
+  <arg name="serial_port" default="/dev/ttyACM0" />
+  <arg name="baud_rate" default="115200" />
+
+  <arg name="load_params" default="true" />
+  <arg name="params_name" default="params.yaml" />
+  <arg name="params_file" default="$(find uwb)/config/$(arg params_name)" />
+
+  <arg name="ignore_z_position" default="true" />
+  <arg name="tracker_frame" default="vicon/UWB_Solo/UWB_Solo" />
+  <arg name="target_frame" default="uwb/target" />
+
+  <include file="$(find uwb)/launch/uwb_serial.launch">
+    <arg name="serial_port" value="$(arg serial_port)" />
+    <arg name="baud_rate" value="$(arg baud_rate)" />
+  </include>
+
+  <include file="$(find uwb)/launch/uwb_multi_range.launch">
+    <arg name="no_serial_link" value="true" />
+    <arg name="show_plots" value="$(arg show_plots)" />
+    <arg name="load_params" value="$(arg load_params)" />
+    <arg name="params_name" value="$(arg params_name)" />
+    <arg name="params_file" value="$(arg params_file)" />
+  </include>
+
+  <include file="$(find uwb)/launch/uwb_tracker.launch">
+    <arg name="no_multi_range" value="true" />
+    <arg name="show_plots" value="$(arg show_plots)" />
+    <arg name="ignore_z_position" value="$(arg ignore_z_position)" />
+    <arg name="tracker_frame" value="$(arg tracker_frame)" />
+    <arg name="target_frame" value="$(arg target_frame)" />
+  </include>
+</launch>
