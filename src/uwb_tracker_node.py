@@ -11,6 +11,7 @@ import sys
 import numpy as np
 import serial
 import roslib
+import scipy.stats
 roslib.load_manifest('uwb')
 import rospy
 import tf
@@ -79,6 +80,10 @@ class UWBTracker(object):
 
         # Get parameters for filter update and initial gauss-newton estimation
         self.ignore_z_position = rospy.get_param('~ignore_z_position', True)
+        # The default value of 7.779 represents the 0.9 quantile of a Chi-Square distribution
+        # with 4 degrees of freedom (4 UWB measurements).
+        self.outlier_threshold_quantile = rospy.get_param('~outlier_threshold_quantile', 0.1)
+        self.outlier_thresholds = {}
         self.ikf_iterations = rospy.get_param('~ikf_iterations', 4)
         self.initial_guess_iterations = rospy.get_param('~initial_guess_iterations', 200)
         self.initial_guess_tolerance = rospy.get_param('~initial_guess_tolerance', 1e-5)
@@ -88,6 +93,7 @@ class UWBTracker(object):
         self.ikf_outlier_count = 0
 
         self.estimates = {}
+        self.estimate_times = {}
 
         self.show_plots = show_plots
         if show_plots:
@@ -114,7 +120,7 @@ class UWBTracker(object):
         else:
             # Publish tracker message
             ros_msg = uwb.msg.UWBTracker()
-            ros_msg.header.stamp = rospy.Time.now()
+            ros_msg.header.stamp = rospy.get_rostime()
             ros_msg.address = multi_range_msg.address
             ros_msg.remote_address = multi_range_msg.remote_address
             ros_msg.state = new_estimate.state
@@ -125,7 +131,7 @@ class UWBTracker(object):
             self.tf_broadcaster.sendTransform(
                 (new_estimate.state[0], new_estimate.state[1], new_estimate.state[2]),
                 tf.transformations.quaternion_from_euler(0, 0, 0),
-                rospy.Time.now(),
+                rospy.get_rostime(),
                 self.target_frame,
                 self.tracker_frame
             )
@@ -136,6 +142,7 @@ class UWBTracker(object):
         P[3:6, 3:6] = 0
         estimate = UWBTracker.StateEstimate(x, P)
         self.estimates[estimate_id] = estimate
+        self.estimate_times[estimate_id] = rospy.get_time()
 
     def update_estimate(self, multi_range_msg):
         estimate_id = (multi_range_msg.address, multi_range_msg.remote_address)
@@ -145,9 +152,15 @@ class UWBTracker(object):
                 return None
             self.initialize_estimate(estimate_id, initial_state)
 
+        current_time = rospy.get_time()
+        timestep = current_time - self.estimate_times[estimate_id]
         estimate = self.estimates[estimate_id]
-        new_estimate, outlier_flag = self.update_filter(estimate, multi_range_msg.ranges)
-        self.estimates[estimate_id] = new_estimate
+        new_estimate, outlier_flag = self.update_filter(timestep, estimate, multi_range_msg.ranges)
+        if not outlier_flag:
+            self.estimates[estimate_id] = new_estimate
+            self.estimate_times[estimate_id] = current_time
+            if self.ikf_prev_outlier_flag:
+                self.ikf_prev_outlier_flag = False
         # If too many outliers are encountered in a row the estimate is deleted.
         # This will lead to a new initial guess for the next multi-range message.
         if outlier_flag:
@@ -160,8 +173,6 @@ class UWBTracker(object):
                 rospy.loginfo('Too many outliers in a row. Resetting estimate for address={}, remote_address={}'.format(
                     multi_range_msg.address, multi_range_msg.remote_address
                 ))
-        if not outlier_flag and self.ikf_prev_outlier_flag:
-            self.ikf_prev_outlier_flag = False
 
         # Optionally: Update plots
         if self.show_plots:
@@ -169,12 +180,12 @@ class UWBTracker(object):
 
         return new_estimate
 
-    def _compute_measurements_and_jacobians(self, ranges, position, h, H, z, ignore_z_position):
+    def _compute_measurements_and_jacobians(self, ranges, position, h, H, z):
         for j in xrange(len(ranges)):
             offset = ranges[j].offset
             offset = np.array([[offset.x], [offset.y], [offset.z]])
             # Observation
-            if ignore_z_position:
+            if self.ignore_z_position:
                 h[j] = np.linalg.norm(position[0:2] - offset[0:2])
             else:
                 h[j] = np.linalg.norm(position - offset)
@@ -187,7 +198,7 @@ class UWBTracker(object):
             # distance by position
             h_to_x = h_to_hs[0] * hs_to_x
             H[j, 0:3] = h_to_x[:, 0]
-            if ignore_z_position:
+            if self.ignore_z_position:
                 H[j, 2] = 0
             else:
                 H[j, 0:3] = h_to_x[:, 0]
@@ -201,7 +212,7 @@ class UWBTracker(object):
         h = np.zeros((num_of_units, 1))
         residuals = np.zeros((num_of_units, 1))
         for i in xrange(self.initial_guess_iterations):
-            self._compute_measurements_and_jacobians(ranges, position, h, H, z, self.ignore_z_position)
+            self._compute_measurements_and_jacobians(ranges, position, h, H, z)
             new_residuals = z - h
             position = position + np.dot(np.linalg.lstsq(np.dot(H.T, H), H.T)[0], new_residuals)
             if np.sum((new_residuals - residuals) ** 2) < self.initial_guess_tolerance:
@@ -227,13 +238,12 @@ class UWBTracker(object):
         self.measurement_covariance = R
         return F, R, Q
 
-    def update_filter(self, estimate, ranges):
+    def update_filter(self, timestep, estimate, ranges):
         num_of_units = len(ranges)
         x = estimate.state
         P = estimate.covariance
         # Compute process matrix and covariance matrices
-        dt = 1 / 80.
-        F, R, Q = self._compute_process_and_covariance_matrices(dt)
+        F, R, Q = self._compute_process_and_covariance_matrices(timestep)
         rospy.logdebug('F: {}'.format(F))
         rospy.logdebug('Q: {}'.format(Q))
         rospy.logdebug('R: {}'.format(R))
@@ -247,12 +257,15 @@ class UWBTracker(object):
         h = np.zeros((num_of_units, 1))
         for i in xrange(self.ikf_iterations):
             new_position = n[0:3]
-            self._compute_measurements_and_jacobians(ranges, new_position, h, H, z, self.ignore_z_position)
+            self._compute_measurements_and_jacobians(ranges, new_position, h, H, z)
             res = z - h
             S = np.dot(np.dot(H, estimate.covariance), H.T) + R
             K = np.dot(estimate.covariance, np.linalg.lstsq(S.T, H)[0].T)
-            mahal = np.sqrt(np.dot(np.linalg.lstsq(S.T, res)[0].T, res))
-            if mahal < 7.779:
+            mahalanobis = np.sqrt(np.dot(np.linalg.lstsq(S.T, res)[0].T, res))
+            if res.size not in self.outlier_thresholds:
+                self.outlier_thresholds[res.size] = scipy.stats.chi2.isf(self.outlier_threshold_quantile, res.size)
+            outlier_threshold = self.outlier_thresholds[res.size]
+            if mahalanobis < outlier_threshold:
                 n = x + np.dot(K, (res - np.dot(H, x - n)))
                 outlier_flag = False
             else:
