@@ -323,8 +323,15 @@ class UWBMultiRange(object):
         else:
             rospy.spin()
 
+    def stop(self):
+        if self.show_plots:
+            import pyqtgraph
+            pyqtgraph.QtGui.QApplication.quit()
+
 
 def main():
+    import signal
+
     rospy.init_node('uwb_multi_range_node')
 
     show_plots = rospy.get_param('~show_plots', True)
@@ -338,6 +345,10 @@ def main():
 
     u = UWBMultiRange(uwb_multi_range_topic, uwb_multi_range_raw_topic, uwb_multi_range_with_offsets_topic,
                       uwb_timestamps_topic, show_plots)
+    def sigint_handler(sig, _):
+        if sig == signal.SIGINT:
+            u.stop()
+    signal.signal(signal.SIGINT, sigint_handler)
     try:
         u.exec_()
     except (rospy.ROSInterruptException, select.error):
