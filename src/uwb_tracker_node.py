@@ -115,7 +115,7 @@ class UWBTracker(object):
         # Update tracker position based on time-of-flight measurements
         new_estimate = self.update_estimate(multi_range_msg)
         if new_estimate is None:
-            rospy.loginfo('Could not compute initial estimate: address={}, remote_address={}'.format(
+            rospy.logwarn('Could not compute initial estimate: address={}, remote_address={}'.format(
                 multi_range_msg.address, multi_range_msg.remote_address))
         else:
             # Publish tracker message
@@ -218,7 +218,7 @@ class UWBTracker(object):
             if np.sum((new_residuals - residuals) ** 2) < self.initial_guess_tolerance:
                 break
             residuals = new_residuals
-        rospy.logdebug('initial guess residuals: {}'.format(residuals))
+        rospy.loginfo('initial guess residuals: {}'.format(residuals))
         if np.any(np.abs(residuals) > self.initial_guess_residuals_threshold):
             # This initial guess is not good enough
             return None
