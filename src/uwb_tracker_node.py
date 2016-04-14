@@ -64,14 +64,6 @@ class UWBTracker(object):
             self.covariance = covariance
 
     def __init__(self, uwb_multi_range_topic, uwb_tracker_topic, tracker_frame, target_frame, show_plots):
-        # ROS publishers and subscribers
-        self.uwb_multi_range_sub = rospy.Subscriber(uwb_multi_range_topic, uwb.msg.UWBMultiRangeWithOffsets,
-                                            self.handle_multi_range_message)
-        self.uwb_pub = rospy.Publisher(uwb_tracker_topic, uwb.msg.UWBTracker, queue_size=1)
-        self.tf_broadcaster = tf.TransformBroadcaster()
-        self.tracker_frame = tracker_frame
-        self.target_frame = target_frame
-
         # Get parameters for covariance matrices
         self.initial_position_covariance = rospy.get_param('~initial_position_covariance', 10)
         self.process_covariance_position = rospy.get_param('~process_covariance_position', 0)
@@ -98,6 +90,14 @@ class UWBTracker(object):
         self.show_plots = show_plots
         if show_plots:
             self._setup_plots()
+
+        # ROS publishers and subscribers
+        self.tracker_frame = tracker_frame
+        self.target_frame = target_frame
+        self.uwb_pub = rospy.Publisher(uwb_tracker_topic, uwb.msg.UWBTracker, queue_size=1)
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.uwb_multi_range_sub = rospy.Subscriber(uwb_multi_range_topic, uwb.msg.UWBMultiRangeWithOffsets,
+                                            self.handle_multi_range_message)
 
     def _setup_plots(self):
         from gui_utils import MainWindow
