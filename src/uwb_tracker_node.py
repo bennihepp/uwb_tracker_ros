@@ -166,8 +166,8 @@ class UWBTracker(object):
         if outlier_flag:
             if not self.ikf_prev_outlier_flag:
                 self.ikf_prev_outlier_flag = True
-                self.ikf_max_outlier_count = 0
-            self.ikf_outlier_count += self.ikf_outlier_count
+                self.ikf_outlier_count = 0
+            self.ikf_outlier_count += 1
             if self.ikf_outlier_count >= self.ikf_max_outlier_count:
                 del self.estimates[estimate_id]
                 rospy.loginfo('Too many outliers in a row. Resetting estimate for address={}, remote_address={}'.format(
@@ -200,8 +200,6 @@ class UWBTracker(object):
             H[j, 0:3] = h_to_x[:, 0]
             if self.ignore_z_position:
                 H[j, 2] = 0
-            else:
-                H[j, 0:3] = h_to_x[:, 0]
             z[j] = ranges[j].range
 
     def initial_guess(self, ranges):
