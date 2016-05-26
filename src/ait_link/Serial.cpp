@@ -80,6 +80,7 @@ int Serial::write(const uint8_t *buf, int size) {
   if (ec) {
     throw std::runtime_error("Failed to write to serial port: " + ec.message());
   }
+  return written;
 }
 
 void Serial::asyncReadSome() {
