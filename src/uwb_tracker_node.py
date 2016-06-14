@@ -76,7 +76,11 @@ class UWBTracker(object):
         # with 4 degrees of freedom (4 UWB measurements).
         self.outlier_threshold_quantile = rospy.get_param('~outlier_threshold_quantile', 0.1)
         self.outlier_thresholds = {}
-        self.ikf_iterations = rospy.get_param('~ikf_iterations', 4)
+        self.ikf_iterations = rospy.get_param('~ikf_iterations', 2)
+        self.initial_guess_position = np.empty((3, 1), dtype=np.float)
+        self.initial_guess_position[0] = rospy.get_param('~initial_guess_position_x', 0)
+        self.initial_guess_position[1] = rospy.get_param('~initial_guess_position_y', 0)
+        self.initial_guess_position[2] = rospy.get_param('~initial_guess_position_z', 0)
         self.initial_guess_iterations = rospy.get_param('~initial_guess_iterations', 200)
         self.initial_guess_tolerance = rospy.get_param('~initial_guess_tolerance', 1e-5)
         self.initial_guess_residuals_threshold = rospy.get_param('~initial_guess_residuals_threshold', 0.1)
@@ -194,7 +198,7 @@ class UWBTracker(object):
             # squared distance by position
             hs_to_x = 2 * position - 2 * offset
             # distance by squared distance
-            h_to_hs = 1 / (2 * np.sqrt(h[j]))
+            h_to_hs = 1 / (2 * h[j])
             # distance by position
             h_to_x = h_to_hs[0] * hs_to_x
             H[j, 0:3] = h_to_x[:, 0]
@@ -204,7 +208,7 @@ class UWBTracker(object):
 
     def initial_guess(self, ranges):
         num_of_units = len(ranges)
-        position = np.zeros((3, 1))
+        position = self.initial_guess_position
         H = np.zeros((num_of_units, position.size))
         z = np.zeros((num_of_units, 1))
         h = np.zeros((num_of_units, 1))
@@ -212,7 +216,7 @@ class UWBTracker(object):
         for i in xrange(self.initial_guess_iterations):
             self._compute_measurements_and_jacobians(ranges, position, h, H, z)
             new_residuals = z - h
-            position = position + np.dot(np.linalg.lstsq(np.dot(H.T, H), H.T)[0], new_residuals)
+            position = position + np.dot(self._solve_equation_least_squares(np.dot(H.T, H), H.T), new_residuals)
             if np.sum((new_residuals - residuals) ** 2) < self.initial_guess_tolerance:
                 break
             residuals = new_residuals
@@ -236,15 +240,53 @@ class UWBTracker(object):
         self.measurement_covariance = R
         return F, R, Q
 
+    def _solve_equation_least_squares(self, A, B):
+        # Pseudo-inverse
+        X = np.dot(np.linalg.pinv(A), B)
+        # LU decomposition
+        # lu, piv = scipy.linalg.lu_factor(A)
+        # X = scipy.linalg.lu_solve((lu, piv), B)
+        # Vanilla least-squares from numpy
+        # X, _, _, _ = np.linalg.lstsq(A, B)
+        # QR decomposition
+        # Q, R, P = scipy.linalg.qr(A, mode='economic', pivoting=True)
+        # # Find first zero element in R
+        # out = np.where(np.diag(R) == 0)[0]
+        # if out.size == 0:
+        #     i = R.shape[0]
+        # else:
+        #     i = out[0]
+        # B_prime = np.dot(Q.T, B)
+        # X = np.zeros((A.shape[1], B.shape[1]), dtype=A.dtype)
+        # X[P[:i], :] = scipy.linalg.solve_triangular(R[:i, :i], B_prime[:i, :])
+        return X
+
+    def _ikf_iteration(self, x, n, ranges, h, H, z, estimate, R):
+        new_position = n[0:3]
+        self._compute_measurements_and_jacobians(ranges, new_position, h, H, z)
+        res = z - h
+        S = np.dot(np.dot(H, estimate.covariance), H.T) + R
+        K = np.dot(estimate.covariance, self._solve_equation_least_squares(S.T, H).T)
+        mahalanobis = np.sqrt(np.dot(self._solve_equation_least_squares(S.T, res).T, res))
+        if res.size not in self.outlier_thresholds:
+            self.outlier_thresholds[res.size] = scipy.stats.chi2.isf(self.outlier_threshold_quantile, res.size)
+        outlier_threshold = self.outlier_thresholds[res.size]
+        if mahalanobis < outlier_threshold:
+            n = x + np.dot(K, (res - np.dot(H, x - n)))
+            outlier_flag = False
+        else:
+            outlier_flag = True
+        return n, K, outlier_flag
+
     def update_filter(self, timestep, estimate, ranges):
         num_of_units = len(ranges)
         x = estimate.state
         P = estimate.covariance
         # Compute process matrix and covariance matrices
         F, R, Q = self._compute_process_and_covariance_matrices(timestep)
-        rospy.logdebug('F: {}'.format(F))
-        rospy.logdebug('Q: {}'.format(Q))
-        rospy.logdebug('R: {}'.format(R))
+        # rospy.logdebug('F: {}'.format(F))
+        # rospy.logdebug('Q: {}'.format(Q))
+        # rospy.logdebug('R: {}'.format(R))
         # Prediction
         x = np.dot(F, x)
         P = np.dot(F, np.dot(P, F.T)) + Q
@@ -254,20 +296,7 @@ class UWBTracker(object):
         z = np.zeros((num_of_units, 1))
         h = np.zeros((num_of_units, 1))
         for i in xrange(self.ikf_iterations):
-            new_position = n[0:3]
-            self._compute_measurements_and_jacobians(ranges, new_position, h, H, z)
-            res = z - h
-            S = np.dot(np.dot(H, estimate.covariance), H.T) + R
-            K = np.dot(estimate.covariance, np.linalg.lstsq(S.T, H)[0].T)
-            mahalanobis = np.sqrt(np.dot(np.linalg.lstsq(S.T, res)[0].T, res))
-            if res.size not in self.outlier_thresholds:
-                self.outlier_thresholds[res.size] = scipy.stats.chi2.isf(self.outlier_threshold_quantile, res.size)
-            outlier_threshold = self.outlier_thresholds[res.size]
-            if mahalanobis < outlier_threshold:
-                n = x + np.dot(K, (res - np.dot(H, x - n)))
-                outlier_flag = False
-            else:
-                outlier_flag = True
+            n, K, outlier_flag = self._ikf_iteration(x, n, ranges, h, H, z, estimate, R)
         if outlier_flag:
             new_estimate = estimate
         else:
