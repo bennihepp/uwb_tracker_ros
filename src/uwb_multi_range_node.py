@@ -2,54 +2,19 @@
 
 """uwb_multi_range_node.py: Streams UWB multi-range measurements based on UWB timestamps."""
 
+from __future__ import print_function
+
 __author__      = "Benjamin Hepp"
 __email__ = "benjamin.hepp@inf.ethz.ch"
 __copyright__   = "Copyright 2015 Benjamin Hepp"
 
 import select
-import sys
 import numpy as np
-import serial
 import roslib
 roslib.load_manifest('uwb')
 import rospy
 
 import uwb.msg
-
-
-class PlotData(object):
-
-    def __init__(self, plot, max_data_length=None):
-        self.plot = plot
-        self.curves = []
-        self.data = []
-        self.max_data_length = max_data_length
-
-    def add_curve(self, pen, initial_data=None, **kwargs):
-        self.curves.append(self.plot.plot(pen=pen, **kwargs))
-        if initial_data is None:
-            if self.max_data_length is None:
-                initial_data = []
-            else:
-                initial_data = np.zeros((self.max_data_length,))
-        self.data.append(initial_data)
-
-    def add_point(self, index, value):
-        assert(index < len(self.curves))
-        if self.max_data_length is None:
-            self.data[index].append(value)
-        else:
-            self.data[index][:-1] = self.data[index][1:]
-            self.data[index][-1] = value
-            if len(self.data[index]) > self.max_data_length:
-                self.data[index] = self.data[index][-self.max_data_length:len(self.data[index])]
-        self.curves[index].setData(self.data[index])
-
-    def get_plot(self):
-        return self.plot
-
-    def __len__(self):
-        return len(self.curves)
 
 
 class UWBMultiRange(object):
@@ -64,37 +29,40 @@ class UWBMultiRange(object):
 
     VISUALIZATION_DATA_LENGTH = 500
 
-    def __init__(self, uwb_multi_range_topic, uwb_multi_range_raw_topic, uwb_multi_range_with_offsets_topic,
-                 uwb_timestamps_topic, show_plots):
-        self._read_unit_offsets()
+    def __init__(self):
+        self._read_configuration()
 
-        self.show_plots = show_plots
-        if show_plots:
+        if self.show_plots:
             self._setup_plots()
 
+        rospy.loginfo("Receiving timestamp messages from {}".format(self.uwb_timestamps_topic))
+        rospy.loginfo("Publishing multi-range messages to {}".format(self.uwb_multi_range_topic))
+        rospy.loginfo("Publishing raw multi-range messages to {}".format(self.uwb_multi_range_raw_topic))
+        rospy.loginfo("Publishing multi-range-with-offsets messages to {}".format(
+            self.uwb_multi_range_with_offsets_topic))
+
         # ROS Publishers
-        self.uwb_pub = rospy.Publisher(uwb_multi_range_topic, uwb.msg.UWBMultiRange, queue_size=1)
-        self.uwb_raw_pub = rospy.Publisher(uwb_multi_range_raw_topic, uwb.msg.UWBMultiRange, queue_size=1)
-        self.uwb_with_offsets_pub = rospy.Publisher(uwb_multi_range_with_offsets_topic,
+        self.uwb_pub = rospy.Publisher(self.uwb_multi_range_topic, uwb.msg.UWBMultiRange, queue_size=1)
+        self.uwb_raw_pub = rospy.Publisher(self.uwb_multi_range_raw_topic, uwb.msg.UWBMultiRange, queue_size=1)
+        self.uwb_with_offsets_pub = rospy.Publisher(self.uwb_multi_range_with_offsets_topic,
                                                     uwb.msg.UWBMultiRangeWithOffsets, queue_size=1)
-        self.uwb_timestamps_sub = rospy.Subscriber(uwb_timestamps_topic, uwb.msg.UWBMultiRangeTimestamps,
+        self.uwb_timestamps_sub = rospy.Subscriber(self.uwb_timestamps_topic, uwb.msg.UWBMultiRangeTimestamps,
                                                    self.handle_timestamps_message)
 
         # Variables for rate display
         self.msg_count = 0
         self.last_now = rospy.get_time()
 
-    def _setup_plots(self):
-        from gui_utils import MainWindow
-        self.window = MainWindow()
-        self.range_plot = PlotData(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
-        self.range_plot.get_plot().addLegend()
-        self.window.nextRow()
-        self.clock_offset_plot = PlotData(self.window.addPlot(title="Clock offset"), self.VISUALIZATION_DATA_LENGTH)
-        self.clock_offset_plot.get_plot().addLegend()
-        self.window.nextRow()
-        self.clock_skew_plot = PlotData(self.window.addPlot(title="Clock skew"), self.VISUALIZATION_DATA_LENGTH)
-        self.clock_skew_plot.get_plot().addLegend()
+    def _read_configuration(self):
+        self._read_unit_offsets()
+        self.show_plots = rospy.get_param('~show_plots', True)
+        self.show_slave_clock_offset = rospy.get_param('~show_slave_clock_offset', False)
+        self.show_slave_clock_skew = rospy.get_param('~show_slave_clock_skew', False)
+        self.uwb_timestamps_topic = rospy.get_param('~timestamps_topic', '/uwb/timestamps')
+        self.uwb_multi_range_topic = rospy.get_param('~multi_range_topic', '/uwb/multi_range')
+        self.uwb_multi_range_raw_topic = rospy.get_param('~multi_range_raw_topic', '/uwb/multi_range_raw')
+        self.uwb_multi_range_with_offsets_topic = rospy.get_param('~multi_range_with_offsets_topic',
+                                                                  '/uwb/multi_range_with_offsets')
 
     def _read_unit_offsets(self):
         if not rospy.has_param('~num_of_units'):
@@ -113,6 +81,18 @@ class UWBMultiRange(object):
             self._unit_coefficients[i, :] = [p0, p1]
         rospy.loginfo("Unit offsets: {}".format(self._unit_offsets))
         rospy.loginfo("Unit coefficients: {}".format(self._unit_coefficients))
+
+    def _setup_plots(self):
+        from gui_utils import MainWindow, PlotData
+        self.window = MainWindow()
+        self.range_plot = PlotData(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
+        self.range_plot.get_plot().addLegend()
+        self.window.nextRow()
+        self.clock_offset_plot = PlotData(self.window.addPlot(title="Clock offset"), self.VISUALIZATION_DATA_LENGTH)
+        self.clock_offset_plot.get_plot().addLegend()
+        self.window.nextRow()
+        self.clock_skew_plot = PlotData(self.window.addPlot(title="Clock skew"), self.VISUALIZATION_DATA_LENGTH)
+        self.clock_skew_plot.get_plot().addLegend()
 
     def handle_timestamps_message(self, multi_range_raw_msg):
         # Compute time-of-flight and ranges from timestamps measurements
@@ -293,26 +273,30 @@ class UWBMultiRange(object):
             curve_index = len(self.clock_offset_plot)
             pen = pyqtgraph.mkPen(curve_index)
             self.clock_offset_plot.add_curve(pen=pen, name="{}".format(curve_index))
-        if len(self.clock_offset_plot) < num_of_units + 1:
-            curve_index = len(self.clock_offset_plot)
-            pen = pyqtgraph.mkPen(curve_index)
-            self.clock_offset_plot.add_curve(pen=pen, name="slave")
+        if self.show_slave_clock_offset:
+            if len(self.clock_offset_plot) < num_of_units + 1:
+                curve_index = len(self.clock_offset_plot)
+                pen = pyqtgraph.mkPen(curve_index)
+                self.clock_offset_plot.add_curve(pen=pen, name="slave")
         for i in xrange(num_of_units):
             self.clock_offset_plot.add_point(i, clock_offsets[i])
-        self.clock_offset_plot.add_point(len(self.clock_offset_plot) - 1, slave_clock_offset)
+        if self.show_slave_clock_offset:
+            self.clock_offset_plot.add_point(len(self.clock_offset_plot) - 1, slave_clock_offset)
 
         # clock skew
         while len(self.clock_skew_plot) < num_of_units:
             curve_index = len(self.clock_skew_plot)
             pen = pyqtgraph.mkPen(curve_index)
             self.clock_skew_plot.add_curve(pen=pen, name="{}".format(curve_index))
-        if len(self.clock_skew_plot) < num_of_units + 1:
-            curve_index = len(self.clock_skew_plot)
-            pen = pyqtgraph.mkPen(curve_index)
-            self.clock_skew_plot.add_curve(pen=pen, name="slave")
+        if self.show_slave_clock_skew:
+            if len(self.clock_skew_plot) < num_of_units + 1:
+                curve_index = len(self.clock_skew_plot)
+                pen = pyqtgraph.mkPen(curve_index)
+                self.clock_skew_plot.add_curve(pen=pen, name="slave")
         for i in xrange(num_of_units):
             self.clock_skew_plot.add_point(i, clock_skews[i])
-        self.clock_skew_plot.add_point(len(self.clock_skew_plot) - 1, slave_clock_skew)
+        if self.show_slave_clock_skew:
+            self.clock_skew_plot.add_point(len(self.clock_skew_plot) - 1, slave_clock_skew)
 
     def exec_(self):
         if self.show_plots:
@@ -335,22 +319,13 @@ def main():
     import signal
 
     rospy.init_node('uwb_multi_range_node')
+    u = UWBMultiRange()
 
-    show_plots = rospy.get_param('~show_plots', True)
-    uwb_timestamps_topic = rospy.get_param('~timestamps_topic', '/uwb/timestamps')
-    uwb_multi_range_topic = rospy.get_param('~multi_range_topic', '/uwb/multi_range')
-    uwb_multi_range_raw_topic = rospy.get_param('~multi_range_raw_topic', '/uwb/multi_range_raw')
-    uwb_multi_range_with_offsets_topic = rospy.get_param('~multi_range_with_offsets_topic', '/uwb/multi_range_with_offsets')
-    rospy.loginfo("Publishing multi-range messages to {}".format(uwb_multi_range_topic))
-    rospy.loginfo("Publishing raw multi-range messages to {}".format(uwb_multi_range_raw_topic))
-    rospy.loginfo("Publishing multi-range-with-offsets messages to {}".format(uwb_multi_range_with_offsets_topic))
-
-    u = UWBMultiRange(uwb_multi_range_topic, uwb_multi_range_raw_topic, uwb_multi_range_with_offsets_topic,
-                      uwb_timestamps_topic, show_plots)
     def sigint_handler(sig, _):
         if sig == signal.SIGINT:
             u.stop()
     signal.signal(signal.SIGINT, sigint_handler)
+
     try:
         u.exec_()
     except (rospy.ROSInterruptException, select.error):

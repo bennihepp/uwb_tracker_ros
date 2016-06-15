@@ -2,14 +2,14 @@
 
 """uwb_tracker_node.py: Streams tracked positions based on UWB multi-range messages."""
 
+from __future__ import print_function
+
 __author__      = "Benjamin Hepp"
 __email__ = "benjamin.hepp@inf.ethz.ch"
 __copyright__   = "Copyright 2015 Benjamin Hepp"
 
 import select
-import sys
 import numpy as np
-import serial
 import roslib
 import scipy.stats
 roslib.load_manifest('uwb')
@@ -19,51 +19,58 @@ import tf
 import uwb.msg
 
 
-class PlotData(object):
-
-    def __init__(self, plot, max_data_length=None):
-        self.plot = plot
-        self.curves = []
-        self.data = []
-        self.max_data_length = max_data_length
-
-    def add_curve(self, pen, initial_data=None, **kwargs):
-        self.curves.append(self.plot.plot(pen=pen, **kwargs))
-        if initial_data is None:
-            if self.max_data_length is None:
-                initial_data = []
-            else:
-                initial_data = np.zeros((self.max_data_length,))
-        self.data.append(initial_data)
-
-    def add_point(self, index, value):
-        assert(index < len(self.curves))
-        if self.max_data_length is None:
-            self.data[index].append(value)
-        else:
-            self.data[index][:-1] = self.data[index][1:]
-            self.data[index][-1] = value
-            if len(self.data[index]) > self.max_data_length:
-                self.data[index] = self.data[index][-self.max_data_length:len(self.data[index])]
-        self.curves[index].setData(self.data[index])
-
-    def get_plot(self):
-        return self.plot
-
-    def __len__(self):
-        return len(self.curves)
-
-
 class UWBTracker(object):
+    """Position tracker for ultra-wideband range measurements.
 
-    VISUALIZATION_DATA_LENGTH = 500
+    By default the z-coordinate of the state is ignored.
+    This can be modified with the ROS parameter `ignore_z_position`.
+    Topics and other options can also be modified with ROS parameters (see the `_read_configuration` method).
+    """
 
     class StateEstimate(object):
+        """State estimate consisting of a state vector and a covariance matrix.
+        """
         def __init__(self, state, covariance):
+            """Initialize a new state estimate.
+
+            Args:
+                state (numpy.ndarray): State vector.
+                covariance (numpy.ndarray): Covariance matrix.
+            """
             self.state = state
             self.covariance = covariance
 
-    def __init__(self, uwb_multi_range_topic, uwb_tracker_topic, tracker_frame, target_frame, show_plots):
+    def __init__(self):
+        """Initialize tracker.
+        """
+        self._read_configuration()
+
+        self.estimates = {}
+        self.estimate_times = {}
+        self.ikf_prev_outlier_flags = {}
+        self.ikf_outlier_counts = {}
+        self.outlier_thresholds = {}
+
+        rospy.loginfo("Receiving raw multi-range messages from: {}".format(self.uwb_multi_range_topic))
+        rospy.loginfo("Publishing tracker messages to {}".format(self.uwb_tracker_topic))
+        rospy.loginfo("Publishing tracker transform as {} -> {}".format(self.tracker_frame, self.target_frame))
+
+        # ROS publishers and subscribers
+        self.tracker_frame = self.tracker_frame
+        self.target_frame = self.target_frame
+        self.uwb_pub = rospy.Publisher(self.uwb_tracker_topic, uwb.msg.UWBTracker, queue_size=1)
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.uwb_multi_range_sub = rospy.Subscriber(self.uwb_multi_range_topic, uwb.msg.UWBMultiRangeWithOffsets,
+                                                    self.handle_multi_range_message)
+
+    def _read_configuration(self):
+        """Initialize configuration from ROS parameters.
+        """
+        self.uwb_multi_range_topic = rospy.get_param('~multi_range_raw_topic', '/uwb/multi_range_with_offsets')
+        self.uwb_tracker_topic = rospy.get_param('~tracker_topic', '/uwb/tracker')
+        self.tracker_frame = rospy.get_param('~tracker_frame', 'uwb')
+        self.target_frame = rospy.get_param('~target_frame', 'target')
+
         # Get parameters for covariance matrices
         self.initial_position_covariance = rospy.get_param('~initial_position_covariance', 10)
         self.process_covariance_position = rospy.get_param('~process_covariance_position', 0)
@@ -75,7 +82,6 @@ class UWBTracker(object):
         # The default value of 7.779 represents the 0.9 quantile of a Chi-Square distribution
         # with 4 degrees of freedom (4 UWB measurements).
         self.outlier_threshold_quantile = rospy.get_param('~outlier_threshold_quantile', 0.1)
-        self.outlier_thresholds = {}
         self.ikf_iterations = rospy.get_param('~ikf_iterations', 2)
         self.initial_guess_position = np.empty((3, 1), dtype=np.float)
         self.initial_guess_position[0] = rospy.get_param('~initial_guess_position_x', 0)
@@ -85,37 +91,13 @@ class UWBTracker(object):
         self.initial_guess_tolerance = rospy.get_param('~initial_guess_tolerance', 1e-5)
         self.initial_guess_residuals_threshold = rospy.get_param('~initial_guess_residuals_threshold', 0.1)
         self.ikf_max_outlier_count = rospy.get_param('~ikf_max_outlier_count', 200)
-        self.ikf_prev_outlier_flag = False
-        self.ikf_outlier_count = 0
-
-        self.estimates = {}
-        self.estimate_times = {}
-
-        self.show_plots = show_plots
-        if show_plots:
-            self._setup_plots()
-
-        # ROS publishers and subscribers
-        self.tracker_frame = tracker_frame
-        self.target_frame = target_frame
-        self.uwb_pub = rospy.Publisher(uwb_tracker_topic, uwb.msg.UWBTracker, queue_size=1)
-        self.tf_broadcaster = tf.TransformBroadcaster()
-        self.uwb_multi_range_sub = rospy.Subscriber(uwb_multi_range_topic, uwb.msg.UWBMultiRangeWithOffsets,
-                                            self.handle_multi_range_message)
-
-    def _setup_plots(self):
-        from gui_utils import MainWindow
-        self.window = MainWindow()
-        self.range_plot = PlotData(self.window.addPlot(title="Ranges"), self.VISUALIZATION_DATA_LENGTH)
-        self.range_plot.get_plot().addLegend()
-        self.window.nextRow()
-        self.clock_offset_plot = PlotData(self.window.addPlot(title="Clock offset"), self.VISUALIZATION_DATA_LENGTH)
-        self.clock_offset_plot.get_plot().addLegend()
-        self.window.nextRow()
-        self.clock_skew_plot = PlotData(self.window.addPlot(title="Clock skew"), self.VISUALIZATION_DATA_LENGTH)
-        self.clock_skew_plot.get_plot().addLegend()
 
     def handle_multi_range_message(self, multi_range_msg):
+        """Handle a ROS multi-range message by updating and publishing the state.
+
+        Args:
+             multi_range_msg (uwb.msg.UWBMultiRangeWithOffsets): ROS multi-range message.
+        """
         # Update tracker position based on time-of-flight measurements
         new_estimate = self.update_estimate(multi_range_msg)
         if new_estimate is None:
@@ -131,7 +113,7 @@ class UWBTracker(object):
             ros_msg.covariance = np.ravel(new_estimate.covariance)
             self.uwb_pub.publish(ros_msg)
 
-            # Publish target transform
+            # Publish target transform (rotation is identity)
             self.tf_broadcaster.sendTransform(
                 (new_estimate.state[0], new_estimate.state[1], new_estimate.state[2]),
                 tf.transformations.quaternion_from_euler(0, 0, 0),
@@ -141,50 +123,71 @@ class UWBTracker(object):
             )
 
     def initialize_estimate(self, estimate_id, initial_state):
+        """Initialize a state estimate with identity covariance.
+
+        The initial estimate is saved in the `self.estimates` dictionary.
+        The timestamp in the `self.estimate_times` is updated.
+
+        Args:
+             estimate_id (int): ID of the tracked target.
+             initial_state (int): Initial state of the estimate.
+
+        Returns:
+             X (numpy.ndarray): Solution of equation.
+        """
         x = initial_state
         P = self.initial_position_covariance * np.eye(6)
         P[3:6, 3:6] = 0
         estimate = UWBTracker.StateEstimate(x, P)
         self.estimates[estimate_id] = estimate
         self.estimate_times[estimate_id] = rospy.get_time()
+        self.ikf_prev_outlier_flags[estimate_id] = False
+        self.ikf_outlier_counts[estimate_id] = 0
 
-    def update_estimate(self, multi_range_msg):
-        estimate_id = (multi_range_msg.address, multi_range_msg.remote_address)
-        if estimate_id not in self.estimates:
-            initial_state = self.initial_guess(multi_range_msg.ranges)
-            if initial_state is None:
-                return None
-            self.initialize_estimate(estimate_id, initial_state)
+    def _solve_equation_least_squares(self, A, B):
+        """Solve system of linear equations A X = B.
+        Currently using Pseudo-inverse because it also allows for singular matrices.
 
-        current_time = rospy.get_time()
-        timestep = current_time - self.estimate_times[estimate_id]
-        estimate = self.estimates[estimate_id]
-        new_estimate, outlier_flag = self.update_filter(timestep, estimate, multi_range_msg.ranges)
-        if not outlier_flag:
-            self.estimates[estimate_id] = new_estimate
-            self.estimate_times[estimate_id] = current_time
-            if self.ikf_prev_outlier_flag:
-                self.ikf_prev_outlier_flag = False
-        # If too many outliers are encountered in a row the estimate is deleted.
-        # This will lead to a new initial guess for the next multi-range message.
-        if outlier_flag:
-            if not self.ikf_prev_outlier_flag:
-                self.ikf_prev_outlier_flag = True
-                self.ikf_outlier_count = 0
-            self.ikf_outlier_count += 1
-            if self.ikf_outlier_count >= self.ikf_max_outlier_count:
-                del self.estimates[estimate_id]
-                rospy.loginfo('Too many outliers in a row. Resetting estimate for address={}, remote_address={}'.format(
-                    multi_range_msg.address, multi_range_msg.remote_address
-                ))
+        Args:
+             A (numpy.ndarray): Left-hand side of equation.
+             B (numpy.ndarray): Right-hand side of equation.
 
-        # Optionally: Update plots
-        if self.show_plots:
-            self.update_visualization(estimate_id, new_estimate, outlier_flag)
-
-        return new_estimate
+        Returns:
+             X (numpy.ndarray): Solution of equation.
+        """
+        # Pseudo-inverse
+        X = np.dot(np.linalg.pinv(A), B)
+        # LU decomposition
+        # lu, piv = scipy.linalg.lu_factor(A)
+        # X = scipy.linalg.lu_solve((lu, piv), B)
+        # Vanilla least-squares from numpy
+        # X, _, _, _ = np.linalg.lstsq(A, B)
+        # QR decomposition
+        # Q, R, P = scipy.linalg.qr(A, mode='economic', pivoting=True)
+        # # Find first zero element in R
+        # out = np.where(np.diag(R) == 0)[0]
+        # if out.size == 0:
+        #     i = R.shape[0]
+        # else:
+        #     i = out[0]
+        # B_prime = np.dot(Q.T, B)
+        # X = np.zeros((A.shape[1], B.shape[1]), dtype=A.dtype)
+        # X[P[:i], :] = scipy.linalg.solve_triangular(R[:i, :i], B_prime[:i, :])
+        return X
 
     def _compute_measurements_and_jacobians(self, ranges, position, h, H, z):
+        """Computes the predicted measurements and the jacobian of the measurement model based on the current state.
+
+        Args:
+             ranges (list of uwb.msg.UWBMultiRange): Range measurement message.
+             position (numpy.ndarray): Current position state.
+             h (``Output``) (numpy.ndarray): Vector for the predicted measurements.
+             H (``Output``) (numpy.ndarray): Vector for the computed jacobian of the measurement model.
+             z (``Output``) (numpy.ndarray): Vector for the range measurements.
+
+        TODO:
+            Could be sped up a bit using Cython
+        """
         for j in xrange(len(ranges)):
             offset = ranges[j].offset
             offset = np.array([[offset.x], [offset.y], [offset.z]])
@@ -207,6 +210,17 @@ class UWBTracker(object):
             z[j] = ranges[j].range
 
     def initial_guess(self, ranges):
+        """Computes an initial position guess based on range measurements.
+
+        The initial position is computed using Gauss-Newton method.
+        The behavior can be modified with some parameters: `self.initial_guess_...`.
+
+        Args:
+             ranges (list of floats): Range measurements.
+
+        Returns:
+            initial_state (numpy.ndarray): Initial state vector (velocity components are zero).
+        """
         num_of_units = len(ranges)
         position = self.initial_guess_position
         H = np.zeros((num_of_units, position.size))
@@ -228,40 +242,57 @@ class UWBTracker(object):
         initial_state[0:3] = position
         return initial_state
 
-    def _compute_process_and_covariance_matrices(self, dt):
-        F = np.array(np.bmat([[np.eye(3), dt * np.eye(3)], [np.zeros((3, 3)), np.eye(3)]]))
-        self.process_matrix = F
-        q_p = self.process_covariance_position
-        q_v = self.process_covariance_velocity
-        Q = np.diag([q_p, q_p, q_p, q_v, q_v, q_v]) ** 2 * dt
-        r = self.measurement_covariance
-        R = r * np.eye(4)
-        self.process_covariance = Q
-        self.measurement_covariance = R
-        return F, R, Q
+    def update_estimate(self, multi_range_msg):
+        """Update tracker based on a multi-range message.
 
-    def _solve_equation_least_squares(self, A, B):
-        # Pseudo-inverse
-        X = np.dot(np.linalg.pinv(A), B)
-        # LU decomposition
-        # lu, piv = scipy.linalg.lu_factor(A)
-        # X = scipy.linalg.lu_solve((lu, piv), B)
-        # Vanilla least-squares from numpy
-        # X, _, _, _ = np.linalg.lstsq(A, B)
-        # QR decomposition
-        # Q, R, P = scipy.linalg.qr(A, mode='economic', pivoting=True)
-        # # Find first zero element in R
-        # out = np.where(np.diag(R) == 0)[0]
-        # if out.size == 0:
-        #     i = R.shape[0]
-        # else:
-        #     i = out[0]
-        # B_prime = np.dot(Q.T, B)
-        # X = np.zeros((A.shape[1], B.shape[1]), dtype=A.dtype)
-        # X[P[:i], :] = scipy.linalg.solve_triangular(R[:i, :i], B_prime[:i, :])
-        return X
+        Updates estimate and timestamp in the `self.estimate` and `self.estimate_times` dictionaries.
+
+        Args:
+             multi_range_msg (uwb.msg.UWBMultiRangeWithOffsets): ROS multi-range message.
+
+        Returns:
+            new_estimate (StateEstimate): Updated position estimate.
+        """
+        estimate_id = (multi_range_msg.address, multi_range_msg.remote_address)
+        if estimate_id not in self.estimates:
+            initial_state = self.initial_guess(multi_range_msg.ranges)
+            if initial_state is None:
+                return None
+            self.initialize_estimate(estimate_id, initial_state)
+
+        current_time = rospy.get_time()
+        timestep = current_time - self.estimate_times[estimate_id]
+        estimate = self.estimates[estimate_id]
+        new_estimate, outlier_flag = self.update_filter(timestep, estimate, multi_range_msg.ranges)
+        if not outlier_flag:
+            self.estimates[estimate_id] = new_estimate
+            self.estimate_times[estimate_id] = current_time
+            if self.ikf_prev_outlier_flags[estimate_id]:
+                self.ikf_prev_outlier_flags[estimate_id] = False
+        # If too many outliers are encountered in a row the estimate is deleted.
+        # This will lead to a new initial guess for the next multi-range message.
+        if outlier_flag:
+            if not self.ikf_prev_outlier_flags[estimate_id]:
+                self.ikf_prev_outlier_flags[estimate_id] = True
+                self.ikf_outlier_counts[estimate_id] = 0
+            self.ikf_outlier_counts[estimate_id] += 1
+            if self.ikf_outlier_counts[estimate_id] >= self.ikf_max_outlier_count:
+                del self.estimates[estimate_id]
+                rospy.loginfo('Too many outliers in a row. Resetting estimate for address={}, remote_address={}'.format(
+                    multi_range_msg.address, multi_range_msg.remote_address
+                ))
+
+        return new_estimate
 
     def _ikf_iteration(self, x, n, ranges, h, H, z, estimate, R):
+        """Update tracker based on a multi-range message.
+
+        Args:
+             multi_range_msg (uwb.msg.UWBMultiRangeWithOffsets): ROS multi-range message.
+
+        Returns:
+            new_estimate (StateEstimate): Updated position estimate.
+        """
         new_position = n[0:3]
         self._compute_measurements_and_jacobians(ranges, new_position, h, H, z)
         res = z - h
@@ -278,12 +309,45 @@ class UWBTracker(object):
             outlier_flag = True
         return n, K, outlier_flag
 
+    def _compute_process_and_covariance_matrices(self, dt):
+        """Computes the transition and covariance matrix of the process model and measurement model.
+
+        Args:
+             dt (float): Timestep of the discrete transition.
+
+        Returns:
+            F (numpy.ndarray): Transition matrix.
+            Q (numpy.ndarray): Process covariance matrix.
+            R (numpy.ndarray): Measurement covariance matrix.
+        """
+        F = np.array(np.bmat([[np.eye(3), dt * np.eye(3)], [np.zeros((3, 3)), np.eye(3)]]))
+        self.process_matrix = F
+        q_p = self.process_covariance_position
+        q_v = self.process_covariance_velocity
+        Q = np.diag([q_p, q_p, q_p, q_v, q_v, q_v]) ** 2 * dt
+        r = self.measurement_covariance
+        R = r * np.eye(4)
+        self.process_covariance = Q
+        self.measurement_covariance = R
+        return F, Q, R
+
     def update_filter(self, timestep, estimate, ranges):
+        """Update position filter.
+
+        Args:
+             timestep (float): Time elapsed since last update.
+             estimate (StateEstimate): Position estimate to update.
+             ranges (list of floats): Range measurements.
+
+        Returns:
+            new_estimate (StateEstimate): Updated position estimate.
+            outlier_flag (bool): Flag indicating whether the measurement was rejected as an outlier.
+        """
         num_of_units = len(ranges)
         x = estimate.state
         P = estimate.covariance
         # Compute process matrix and covariance matrices
-        F, R, Q = self._compute_process_and_covariance_matrices(timestep)
+        F, Q, R = self._compute_process_and_covariance_matrices(timestep)
         # rospy.logdebug('F: {}'.format(F))
         # rospy.logdebug('Q: {}'.format(Q))
         # rospy.logdebug('R: {}'.format(R))
@@ -305,50 +369,24 @@ class UWBTracker(object):
             new_estimate = UWBTracker.StateEstimate(new_state, new_covariance)
         return new_estimate, outlier_flag
 
-    def update_visualization(self, estimate_id, estimate, outlier_flag):
-        if not self.show_plots:
-            return
-
-        import pyqtgraph
-        # TODO: Show any visualization or rely on RViz?
-        pass
-
     def exec_(self):
-        if self.show_plots:
-            import sys
-            import pyqtgraph
-            if sys.flags.interactive != 1 or not hasattr(QtCore, 'PYQT_VERSION'):
-                pyqtgraph.QtGui.QApplication.exec_()
-        else:
-            rospy.spin()
+        rospy.spin()
 
     def stop(self):
-        if self.show_plots:
-            import pyqtgraph
-            pyqtgraph.QtGui.QApplication.quit()
-        else:
-            rospy.signal_shutdown('User request')
+        rospy.signal_shutdown('User request')
 
 
 def main():
     import signal
 
     rospy.init_node('uwb_tracker_node')
+    u = UWBTracker()
 
-    show_plots = rospy.get_param('~show_plots', False)
-    uwb_multi_range_topic = rospy.get_param('~multi_range_raw_topic', '/uwb/multi_range_with_offsets')
-    uwb_tracker_topic = rospy.get_param('~tracker_topic', '/uwb/tracker')
-    tracker_frame = rospy.get_param('~tracker_frame', 'uwb')
-    target_frame = rospy.get_param('~target_frame', 'target')
-    print("Receiving raw multi-range messages from: {}".format(uwb_multi_range_topic))
-    print("Publishing tracker messages to {}".format(uwb_tracker_topic))
-    print("Publishing tracker transform as {} -> {}".format(tracker_frame, target_frame))
-
-    u = UWBTracker(uwb_multi_range_topic, uwb_tracker_topic, tracker_frame, target_frame, show_plots)
     def sigint_handler(sig, _):
         if sig == signal.SIGINT:
             u.stop()
     signal.signal(signal.SIGINT, sigint_handler)
+
     try:
         u.exec_()
     except (rospy.ROSInterruptException, select.error):
