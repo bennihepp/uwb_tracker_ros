@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure 
   message_generation
 )
+find_package(Boost REQUIRED COMPONENTS system thread)
 
 ## System dependencies are found with CMake's conventions
 
