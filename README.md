@@ -36,3 +36,8 @@ A motion-capture system is useful for generating the calibration data but it cou
 measured by hand. The file _calibrate_example.m_ in the _utils_ folder shows how the data for _calibrate.m_ can be generated from motion-capture data.
 
 __Note__: When recording data for calibration make sure to use the uncalibrated measurements from the _uwb_multi_range_ node (otherwise you might use already calibrated values and get a wrong calibration).
+
+## Contact Information
+
+Benjamin Hepp <benjamin.hepp@inf.ethz.ch>
+Tobias Naegeli <tobias.naegeli@inf.ethz.ch>

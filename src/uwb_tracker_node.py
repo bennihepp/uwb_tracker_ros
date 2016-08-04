@@ -5,8 +5,8 @@
 from __future__ import print_function
 
 __author__      = "Benjamin Hepp"
-__email__ = "benjamin.hepp@inf.ethz.ch"
-__copyright__   = "Copyright 2015 Benjamin Hepp"
+__email__       = "benjamin.hepp@inf.ethz.ch"
+__copyright__   = "Copyright 2016 Benjamin Hepp"
 
 import select
 import numpy as np
